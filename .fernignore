@@ -13,15 +13,20 @@ src/roamhq/webhooks.py
 # Roam-Version must fail here rather than silently shipping.
 tests/
 
-# Hand-written docs and legal.
+# Hand-written docs and legal. pyproject.toml is ours too: Fern's
+# local-file-system output on this plan is sources only (pyproject.toml
+# is paid scaffolding), and even if that changes we need the version
+# bump to survive rsync --delete the same way roam-node keeps package.json.
 README.md
 LICENSE
 CHANGELOG.md
 AGENTS.md
 RELEASING.md
+pyproject.toml
 
 # CI, repo metadata.
 .github/
 .gitignore
 .fernignore
 .git
+examples/
