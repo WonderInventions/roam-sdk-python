@@ -1,0 +1,27 @@
+# Files in this repo that Fern's generated output must never overwrite.
+#
+# The generated SDK is rsynced onto the package root by regenerate-sdks.yml
+# in WonderInventions/developer-ro-am. Everything listed here is
+# hand-maintained; everything else is replaced wholesale.
+
+# Hand-written webhook signature verification. Fern's generated helper
+# rejects genuine whsec_ deliveries — see the header of this file.
+src/roamhq/webhooks.py
+
+# Contract tests. HTTP is faked at httpx.MockTransport against the real
+# default host; a regeneration that breaks pagination, retries, or
+# Roam-Version must fail here rather than silently shipping.
+tests/
+
+# Hand-written docs and legal.
+README.md
+LICENSE
+CHANGELOG.md
+AGENTS.md
+RELEASING.md
+
+# CI, repo metadata.
+.github/
+.gitignore
+.fernignore
+.git
