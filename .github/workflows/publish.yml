@@ -1,0 +1,53 @@
+# Publishes roamhq to PyPI via trusted publishing (OIDC). No API token.
+#
+# One-time PyPI setup (cannot be done from this repo):
+#   https://pypi.org/manage/account/publishing/
+#   project: roamhq
+#   owner: WonderInventions
+#   repository: roam-sdk-python
+#   workflow: publish.yml
+#   environment: pypi
+#
+# Also create a GitHub environment named `pypi` on this repo (Settings →
+# Environments). Required reviewers are optional but recommended.
+#
+# First publish of v0.1.0: Actions → Publish → Run workflow, because that
+# tag already exists. Later releases publish when a v* tag is pushed.
+
+name: Publish
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/roamhq/
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1
