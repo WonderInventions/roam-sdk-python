@@ -1,6 +1,6 @@
 [project]
 name = "roamhq"
-version = "0.0.1"
+version = "0.1.0"
 description = "Official Python SDK for the Roam API"
 readme = "README.md"
 license = { text = "MIT" }
