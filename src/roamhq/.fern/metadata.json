@@ -1,0 +1,13 @@
+{
+  "cliVersion": "5.82.0",
+  "generatorName": "fernapi/fern-python-sdk",
+  "generatorVersion": "5.29.3",
+  "generatorConfig": {
+    "package_name": "roamhq",
+    "client_class_name": "RoamClient"
+  },
+  "originGitCommit": "e226955133092595744390682ba317d4ee33f224",
+  "originGitCommitIsDirty": false,
+  "invokedBy": "ci",
+  "ciProvider": "github"
+}
