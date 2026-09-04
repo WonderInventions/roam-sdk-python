@@ -28,6 +28,7 @@ if typing.TYPE_CHECKING:
     from .group_member import GroupMember
     from .group_member_role import GroupMemberRole
     from .group_type import GroupType
+    from .guest_badge import GuestBadge
     from .lobby_booking import LobbyBooking
     from .lobby_booking_host import LobbyBookingHost
     from .lobby_booking_invitee import LobbyBookingInvitee
@@ -80,6 +81,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "GroupMember": ".group_member",
     "GroupMemberRole": ".group_member_role",
     "GroupType": ".group_type",
+    "GuestBadge": ".guest_badge",
     "LobbyBooking": ".lobby_booking",
     "LobbyBookingHost": ".lobby_booking_host",
     "LobbyBookingInvitee": ".lobby_booking_invitee",
@@ -156,6 +158,7 @@ __all__ = [
     "GroupMember",
     "GroupMemberRole",
     "GroupType",
+    "GuestBadge",
     "LobbyBooking",
     "LobbyBookingHost",
     "LobbyBookingInvitee",

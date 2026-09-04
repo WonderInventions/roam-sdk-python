@@ -62,6 +62,10 @@ class UsersClient:
         See [External activity](https://developer.ro.am/docs/guides/user-activity) for display, DND,
         TTL, stacking, and where the indicator appears on the map.
 
+        Identify the user with `userId`: a bare UUID, tagged `U-…` ID, or
+        ASCII email (same convention as `group.create` members). Third-party
+        systems that only have an email do not need a UUID lookup first.
+
         **Access:** Organization and Personal. Organization tokens may target
         any user in the workspace. Personal tokens (OAuth or PAT) may target
         only the token owner.
@@ -72,8 +76,11 @@ class UsersClient:
         Parameters
         ----------
         user_id : str
-            Target user. Bare or tagged UUID. Personal tokens may only
-            pass their own user.
+            Target user. Bare UUID, tagged `U-…` ID, or ASCII email
+            (same convention as `group.create` members). Personal
+            tokens may only pass their own user. Does not require
+            `user:read.email` — email is an identifier, not a
+            disclosure.
 
         external_id : str
             Caller-chosen session id, unique per integration and user.
@@ -124,7 +131,7 @@ class UsersClient:
             token="YOUR_TOKEN",
         )
         client.users.user_activity_set(
-            user_id="0cc74785-e31e-4403-aa5e-0cc7c1897e66",
+            user_id="ada@example.com",
             external_id="justcall:call:CA123",
             display=UserActivityDisplay(
                 emoji="📞",
@@ -173,8 +180,9 @@ class UsersClient:
         Parameters
         ----------
         user_id : str
-            Target user. Bare or tagged UUID. Personal tokens may only
-            pass their own user.
+            Target user. Bare UUID, tagged `U-…` ID, or ASCII email
+            (same convention as `group.create` members). Personal
+            tokens may only pass their own user.
 
         external_id : str
             The `externalId` previously passed to `user.activity.set`.
@@ -195,7 +203,7 @@ class UsersClient:
             token="YOUR_TOKEN",
         )
         client.users.user_activity_clear(
-            user_id="0cc74785-e31e-4403-aa5e-0cc7c1897e66",
+            user_id="ada@example.com",
             external_id="justcall:call:CA123",
         )
         """
@@ -230,8 +238,9 @@ class UsersClient:
         Parameters
         ----------
         user_id : str
-            Target user. Bare or tagged UUID. Personal tokens may only pass
-            their own user.
+            Target user. Bare UUID, tagged `U-…` ID, or ASCII email
+            (same convention as `group.create` members). Personal tokens
+            may only pass their own user.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -408,6 +417,10 @@ class AsyncUsersClient:
         See [External activity](https://developer.ro.am/docs/guides/user-activity) for display, DND,
         TTL, stacking, and where the indicator appears on the map.
 
+        Identify the user with `userId`: a bare UUID, tagged `U-…` ID, or
+        ASCII email (same convention as `group.create` members). Third-party
+        systems that only have an email do not need a UUID lookup first.
+
         **Access:** Organization and Personal. Organization tokens may target
         any user in the workspace. Personal tokens (OAuth or PAT) may target
         only the token owner.
@@ -418,8 +431,11 @@ class AsyncUsersClient:
         Parameters
         ----------
         user_id : str
-            Target user. Bare or tagged UUID. Personal tokens may only
-            pass their own user.
+            Target user. Bare UUID, tagged `U-…` ID, or ASCII email
+            (same convention as `group.create` members). Personal
+            tokens may only pass their own user. Does not require
+            `user:read.email` — email is an identifier, not a
+            disclosure.
 
         external_id : str
             Caller-chosen session id, unique per integration and user.
@@ -475,7 +491,7 @@ class AsyncUsersClient:
 
         async def main() -> None:
             await client.users.user_activity_set(
-                user_id="0cc74785-e31e-4403-aa5e-0cc7c1897e66",
+                user_id="ada@example.com",
                 external_id="justcall:call:CA123",
                 display=UserActivityDisplay(
                     emoji="📞",
@@ -527,8 +543,9 @@ class AsyncUsersClient:
         Parameters
         ----------
         user_id : str
-            Target user. Bare or tagged UUID. Personal tokens may only
-            pass their own user.
+            Target user. Bare UUID, tagged `U-…` ID, or ASCII email
+            (same convention as `group.create` members). Personal
+            tokens may only pass their own user.
 
         external_id : str
             The `externalId` previously passed to `user.activity.set`.
@@ -554,7 +571,7 @@ class AsyncUsersClient:
 
         async def main() -> None:
             await client.users.user_activity_clear(
-                user_id="0cc74785-e31e-4403-aa5e-0cc7c1897e66",
+                user_id="ada@example.com",
                 external_id="justcall:call:CA123",
             )
 
@@ -592,8 +609,9 @@ class AsyncUsersClient:
         Parameters
         ----------
         user_id : str
-            Target user. Bare or tagged UUID. Personal tokens may only pass
-            their own user.
+            Target user. Bare UUID, tagged `U-…` ID, or ASCII email
+            (same convention as `group.create` members). Personal tokens
+            may only pass their own user.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.

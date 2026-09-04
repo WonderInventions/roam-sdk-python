@@ -92,7 +92,21 @@ class WebhookClient:
         Roam does not probe the destination URL when you subscribe — the
         subscription is created immediately and the first delivery is a real event.
 
-        See the [Webhooks overview](https://developer.ro.am/docs/webhooks/webhooks) for the full list of event names and their filters.
+        Optional `filter` limits which occurrences are delivered. Which keys are
+        valid depends on `event` — see that event's page and the
+        [Event Filters](https://developer.ro.am/docs/webhooks/webhooks#event-filters) table. Omit
+        `filter` to receive every occurrence. An empty object (`{}`) is rejected,
+        as is a filter that does not apply to the event.
+
+        **DMs only:**
+
+        ```json
+        {
+          "url": "https://example.com/hooks/messages",
+          "event": "chat.message",
+          "filter": { "chatType": "dm" }
+        }
+        ```
 
         **Required scope:** `webhook:write`
 
@@ -105,6 +119,10 @@ class WebhookClient:
             Event to subscribe to.
 
         filter : typing.Optional[WebhookSubscriptionFilter]
+            Optional event-specific filter. Which keys are valid depends on `event`
+            (see the schema). Omit to receive every occurrence; `{}` and `null` are
+            rejected rather than treated as "omitted". Example for DMs only:
+            `{"chatType": "dm"}`.
 
         api_version : typing.Optional[str]
             Optional [API version](https://developer.ro.am/docs/guides/api-versioning) (`YYYY-MM-DD`) to pin
@@ -122,7 +140,7 @@ class WebhookClient:
 
         Examples
         --------
-        from roamhq import RoamClient, WebhookSubscriptionFilter
+        from roamhq import RoamClient
 
         client = RoamClient(
             roam_version="YOUR_ROAM_VERSION",
@@ -131,9 +149,6 @@ class WebhookClient:
         client.webhook.subscribe(
             url="https://example.com/hooks/messages",
             event="chat.message",
-            filter=WebhookSubscriptionFilter(
-                mention=True,
-            ),
         )
         """
         _response = self._raw_client.subscribe(
@@ -342,7 +357,21 @@ class AsyncWebhookClient:
         Roam does not probe the destination URL when you subscribe — the
         subscription is created immediately and the first delivery is a real event.
 
-        See the [Webhooks overview](https://developer.ro.am/docs/webhooks/webhooks) for the full list of event names and their filters.
+        Optional `filter` limits which occurrences are delivered. Which keys are
+        valid depends on `event` — see that event's page and the
+        [Event Filters](https://developer.ro.am/docs/webhooks/webhooks#event-filters) table. Omit
+        `filter` to receive every occurrence. An empty object (`{}`) is rejected,
+        as is a filter that does not apply to the event.
+
+        **DMs only:**
+
+        ```json
+        {
+          "url": "https://example.com/hooks/messages",
+          "event": "chat.message",
+          "filter": { "chatType": "dm" }
+        }
+        ```
 
         **Required scope:** `webhook:write`
 
@@ -355,6 +384,10 @@ class AsyncWebhookClient:
             Event to subscribe to.
 
         filter : typing.Optional[WebhookSubscriptionFilter]
+            Optional event-specific filter. Which keys are valid depends on `event`
+            (see the schema). Omit to receive every occurrence; `{}` and `null` are
+            rejected rather than treated as "omitted". Example for DMs only:
+            `{"chatType": "dm"}`.
 
         api_version : typing.Optional[str]
             Optional [API version](https://developer.ro.am/docs/guides/api-versioning) (`YYYY-MM-DD`) to pin
@@ -374,7 +407,7 @@ class AsyncWebhookClient:
         --------
         import asyncio
 
-        from roamhq import AsyncRoamClient, WebhookSubscriptionFilter
+        from roamhq import AsyncRoamClient
 
         client = AsyncRoamClient(
             roam_version="YOUR_ROAM_VERSION",
@@ -386,9 +419,6 @@ class AsyncWebhookClient:
             await client.webhook.subscribe(
                 url="https://example.com/hooks/messages",
                 event="chat.message",
-                filter=WebhookSubscriptionFilter(
-                    mention=True,
-                ),
             )
 
 
