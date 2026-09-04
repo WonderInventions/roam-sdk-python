@@ -29,6 +29,7 @@ if typing.TYPE_CHECKING:
         GroupMember,
         GroupMemberRole,
         GroupType,
+        GuestBadge,
         LobbyBooking,
         LobbyBookingHost,
         LobbyBookingInvitee,
@@ -80,6 +81,7 @@ if typing.TYPE_CHECKING:
         conversation,
         group,
         groups,
+        guest_badges,
         item,
         lobby,
         magicast,
@@ -156,6 +158,7 @@ if typing.TYPE_CHECKING:
         MembersGroupResponse,
     )
     from .groups import GroupsListResponseItem
+    from .guest_badges import GuestBadgeListResponse, GuestBadgeRevokeResponse
     from .lobby import ListBookingsLobbyResponse, ListLobbyResponse, ListLobbyResponseLobbiesItem
     from .magicast import ListMagicastResponse
     from .magicasts import MagicastShareLinkResponse
@@ -237,6 +240,9 @@ _dynamic_imports: typing.Dict[str, str] = {
     "GroupMemberRole": ".types",
     "GroupType": ".types",
     "GroupsListResponseItem": ".groups",
+    "GuestBadge": ".types",
+    "GuestBadgeListResponse": ".guest_badges",
+    "GuestBadgeRevokeResponse": ".guest_badges",
     "HistoryChatResponse": ".chat",
     "InfoMeetingResponse": ".meeting",
     "InfoMeetingResponseChaptersItem": ".meeting",
@@ -356,6 +362,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "conversation": ".conversation",
     "group": ".group",
     "groups": ".groups",
+    "guest_badges": ".guest_badges",
     "item": ".item",
     "lobby": ".lobby",
     "magicast": ".magicast",
@@ -438,6 +445,9 @@ __all__ = [
     "GroupMemberRole",
     "GroupType",
     "GroupsListResponseItem",
+    "GuestBadge",
+    "GuestBadgeListResponse",
+    "GuestBadgeRevokeResponse",
     "HistoryChatResponse",
     "InfoMeetingResponse",
     "InfoMeetingResponseChaptersItem",
@@ -557,6 +567,7 @@ __all__ = [
     "conversation",
     "group",
     "groups",
+    "guest_badges",
     "item",
     "lobby",
     "magicast",

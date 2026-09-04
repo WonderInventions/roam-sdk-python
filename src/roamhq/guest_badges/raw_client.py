@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import datetime as dt
 import typing
 from json.decoder import JSONDecodeError
 
@@ -12,7 +11,6 @@ from ..core.http_response import AsyncHttpResponse, HttpResponse
 from ..core.parse_error import ParsingError
 from ..core.pydantic_utilities import parse_obj_as
 from ..core.request_options import RequestOptions
-from ..core.serialization import convert_and_respect_annotation_metadata
 from ..errors.bad_request_error import BadRequestError
 from ..errors.forbidden_error import ForbiddenError
 from ..errors.internal_server_error import InternalServerError
@@ -21,123 +19,82 @@ from ..errors.not_found_error import NotFoundError
 from ..errors.too_many_requests_error import TooManyRequestsError
 from ..errors.unauthorized_error import UnauthorizedError
 from ..types.error import Error
-from ..types.user_activity import UserActivity
-from ..types.user_activity_display import UserActivityDisplay
-from .types.user_activity_list_response import UserActivityListResponse
+from ..types.guest_badge import GuestBadge
+from .types.guest_badge_list_response import GuestBadgeListResponse
+from .types.guest_badge_revoke_response import GuestBadgeRevokeResponse
 from pydantic import ValidationError
 
 # this is used as the default value for optional parameters
 OMIT = typing.cast(typing.Any, ...)
 
 
-class RawUsersClient:
+class RawGuestBadgesClient:
     def __init__(self, *, client_wrapper: SyncClientWrapper):
         self._client_wrapper = client_wrapper
 
-    def user_activity_set(
+    def guest_badge_create(
         self,
         *,
-        user_id: str,
-        external_id: str,
-        display: UserActivityDisplay,
-        ttl_seconds: typing.Optional[int] = OMIT,
-        expires_at: typing.Optional[dt.datetime] = OMIT,
-        started_at: typing.Optional[dt.datetime] = OMIT,
-        dnd: typing.Optional[bool] = OMIT,
+        email: str,
+        host_user_id: typing.Optional[str] = OMIT,
+        visit_permission: typing.Optional[bool] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
-    ) -> HttpResponse[UserActivity]:
+    ) -> HttpResponse[GuestBadge]:
         """
-        Paint a badge (and optional glow) on a user's seat for work happening
-        outside Roam — a phone call, a browser meeting, a CRM session. Pass
-        `dnd: true` to also put their assigned office in Do Not Disturb.
+        Grant a Guest Badge so an email that is **not** a workspace member can
+        visit a host in Roam.
 
-        The integration owns the lifecycle: `set` when the session starts,
-        `clear` when it ends. Re-posting the same `externalId` is the heartbeat
-        for long-running sessions — it refreshes `expiresAt` and, unless you
-        send `startedAt`, keeps the original start time. Roam stamps expiry
-        itself (default 10 minutes, maximum 60) so a dropped "ended" webhook
-        cannot leave a permanent glow.
+        This is **not** an [On-Air event guest](https://developer.ro.am/docs/onair-api/on-air-api). It is
+        also **not** implied by [`group.add`](https://developer.ro.am/docs/api/group-add): adding an email
+        to a group does not mint a badge or send the invite. Typical onboarding is
+        `guest.badge.create` then `group.add`.
 
-        `externalId` is unique per (integration, user). Two apps can hold
-        activities on the same person at once; you can only update or clear
-        your own rows.
+        Repeating create for the same host and email returns the existing badge
+        (`visitPermission` is **not** updated) and does not re-send the invite.
+        To flip on-map access after create, use
+        [`guest.badge.update`](https://developer.ro.am/docs/api/guest-badge-update).
 
-        See [External activity](https://developer.ro.am/docs/guides/user-activity) for display, DND,
-        TTL, stacking, and where the indicator appears on the map.
+        **Access:** Organization and Personal.
+        Organization tokens require `hostUserId`. Personal tokens default to the
+        token owner; naming a different host returns `403` `access_mode_not_supported`.
 
-        Identify the user with `userId`: a bare UUID, tagged `U-…` ID, or
-        ASCII email (same convention as `group.create` members). Third-party
-        systems that only have an email do not need a UUID lookup first.
+        **Required scope:** `guest:write`. Personal Access Tokens use the
+        `pat:guests:write` group.
 
-        **Access:** Organization and Personal. Organization tokens may target
-        any user in the workspace. Personal tokens (OAuth or PAT) may target
-        only the token owner.
-
-        **Required scope:** `user:write.activity`. Personal Access Tokens skip
-        this check; personal-mode OAuth installs must still request the scope.
+        See [Guest Badges](https://developer.ro.am/docs/guides/guest-badges).
 
         Parameters
         ----------
-        user_id : str
-            Target user. Bare UUID, tagged `U-…` ID, or ASCII email
-            (same convention as `group.create` members). Personal
-            tokens may only pass their own user. Does not require
-            `user:read.email` — email is an identifier, not a
-            disclosure.
+        email : str
+            Guest email. ASCII only. Must not be a workspace member.
 
-        external_id : str
-            Caller-chosen session id, unique per integration and user.
-            Re-using it upserts the existing row (heartbeat). At most
-            128 Unicode code points.
+        host_user_id : typing.Optional[str]
+            Host member. UUID or member email — the same convention as
+            [`group.create`](https://developer.ro.am/docs/api/group-create) `members[].userId`.
+            Required for organization tokens. Optional for personal tokens
+            (defaults to the token owner).
 
-        display : UserActivityDisplay
-
-        ttl_seconds : typing.Optional[int]
-            Seconds from now until expiry. Mutually exclusive with
-            `expiresAt`. Values above 3600 are **clamped** to 60
-            minutes, not rejected. Default when both are omitted: 600
-            (10 minutes).
-
-        expires_at : typing.Optional[dt.datetime]
-            Absolute expiry (RFC3339, must be in the future). Mutually
-            exclusive with `ttlSeconds`. Instants more than 60 minutes
-            ahead are clamped to that maximum.
-
-        started_at : typing.Optional[dt.datetime]
-            Optional session start (RFC3339). Omit on heartbeats to
-            preserve the original. A future value is clamped to the
-            server's now (clock skew; also so one integration cannot
-            pin the newest-first projection slot).
-
-        dnd : typing.Optional[bool]
-            If true, this activity contributes Do Not Disturb on the
-            user's **own assigned office** until it is cleared or
-            expires. Defaults to false — a badge does not lock an
-            office unless you opt in. Stacks with Zoom/Meet auto-DND
-            and other integrations' DND-flagged rows.
+        visit_permission : typing.Optional[bool]
+            Whether the guest may visit the host on the map. Defaults to
+            `true`. Ignored on an idempotent retry of an existing grant
+            — use [`guest.badge.update`](https://developer.ro.am/docs/api/guest-badge-update)
+            to change it.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
         Returns
         -------
-        HttpResponse[UserActivity]
-            Activity saved. Body is the live item (same shape `.list` returns
-            per entry), including the server-stamped `startedAt` / `expiresAt`.
+        HttpResponse[GuestBadge]
+            Badge created, or the existing grant returned.
         """
         _response = self._client_wrapper.httpx_client.request(
-            "user.activity.set",
+            "guest.badge.create",
             method="POST",
             json={
-                "userId": user_id,
-                "externalId": external_id,
-                "display": convert_and_respect_annotation_metadata(
-                    object_=display, annotation=UserActivityDisplay, direction="write"
-                ),
-                "ttlSeconds": ttl_seconds,
-                "expiresAt": expires_at,
-                "startedAt": started_at,
-                "dnd": dnd,
+                "email": email,
+                "hostUserId": host_user_id,
+                "visitPermission": visit_permission,
             },
             headers={
                 "content-type": "application/json",
@@ -148,9 +105,9 @@ class RawUsersClient:
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    UserActivity,
+                    GuestBadge,
                     parse_obj_as(
-                        type_=UserActivity,  # type: ignore
+                        type_=GuestBadge,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -241,199 +198,83 @@ class RawUsersClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    def user_activity_clear(
-        self, *, user_id: str, external_id: str, request_options: typing.Optional[RequestOptions] = None
-    ) -> HttpResponse[None]:
+    def guest_badge_list(
+        self,
+        *,
+        email: typing.Optional[str] = None,
+        host_user_id: typing.Optional[str] = None,
+        limit: typing.Optional[int] = None,
+        cursor: typing.Optional[str] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> HttpResponse[GuestBadgeListResponse]:
         """
-        End an activity previously created with [`user.activity.set`](https://developer.ro.am/docs/api/user-activity-set).
-        The row is keyed by this integration plus `userId` and `externalId` —
-        you cannot clear another app's activity.
+        List issued Guest Badges.
 
-        Clearing a missing, already-cleared, or already-expired `externalId`
-        still returns **204**. Integrations retry "session ended" webhooks, and
-        the row may have expired in the meantime.
+        Organization tokens return every issued badge in the workspace. Personal
+        tokens return only badges the token owner issued. This is the issued
+        (host) view — the same rows `guest.badge.create` returns — not the
+        guest's hidden-inbox view.
 
-        See [External activity](https://developer.ro.am/docs/guides/user-activity) for TTL, DND
-        stacking, and what happens on the map when the last activity clears.
+        Filter with `email` (alias-aware) and/or `hostUserId` (UUID or member
+        email). Paginate with `limit` / `cursor` (default 50, max 100). Results
+        are sorted by `(hostUserId, email)`.
 
-        **Access:** Organization and Personal. Organization tokens may target
-        any user in the workspace. Personal tokens (OAuth or PAT) may target
-        only the token owner.
+        Organization keys that only have `guest:write` must also request
+        `guest:read` to call list. Personal Access Tokens with `pat:guests:write`
+        already include `guest:read`.
 
-        **Required scope:** `user:write.activity`. Personal Access Tokens skip
-        this check; personal-mode OAuth installs must still request the scope.
+        **Access:** Organization and Personal.
+        Personal tokens naming a different host return `403`
+        `access_mode_not_supported`.
+
+        **Required scope:** `guest:read`. Personal Access Tokens use the
+        `pat:guests:write` group.
+
+        See [Guest Badges](https://developer.ro.am/docs/guides/guest-badges).
 
         Parameters
         ----------
-        user_id : str
-            Target user. Bare UUID, tagged `U-…` ID, or ASCII email
-            (same convention as `group.create` members). Personal
-            tokens may only pass their own user.
+        email : typing.Optional[str]
+            Guest email. ASCII only. Matches the stored address and its verified
+            domain aliases.
 
-        external_id : str
-            The `externalId` previously passed to `user.activity.set`.
+        host_user_id : typing.Optional[str]
+            Host member. UUID or member email — the same convention as
+            [`group.create`](https://developer.ro.am/docs/api/group-create) `members[].userId`.
+            Archived hosts may be named (they typically have no remaining grants).
+            Personal tokens may only pass the token owner.
+
+        limit : typing.Optional[int]
+            Number of badges to return per page (default 50, max 100).
+
+        cursor : typing.Optional[str]
+            Opaque pagination cursor from a previous response's `nextCursor`. Do not construct cursors manually.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
         Returns
         -------
-        HttpResponse[None]
+        HttpResponse[GuestBadgeListResponse]
+            Issued Guest Badges for this page.
         """
         _response = self._client_wrapper.httpx_client.request(
-            "user.activity.clear",
-            method="POST",
-            json={
-                "userId": user_id,
-                "externalId": external_id,
-            },
-            headers={
-                "content-type": "application/json",
-            },
-            request_options=request_options,
-            omit=OMIT,
-        )
-        try:
-            if 200 <= _response.status_code < 300:
-                return HttpResponse(response=_response, data=None)
-            if _response.status_code == 400:
-                raise BadRequestError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        Error,
-                        parse_obj_as(
-                            type_=Error,  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            if _response.status_code == 401:
-                raise UnauthorizedError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        Error,
-                        parse_obj_as(
-                            type_=Error,  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            if _response.status_code == 403:
-                raise ForbiddenError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        Error,
-                        parse_obj_as(
-                            type_=Error,  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            if _response.status_code == 404:
-                raise NotFoundError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        typing.Any,
-                        parse_obj_as(
-                            type_=typing.Any,  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            if _response.status_code == 405:
-                raise MethodNotAllowedError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        Error,
-                        parse_obj_as(
-                            type_=Error,  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            if _response.status_code == 429:
-                raise TooManyRequestsError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        Error,
-                        parse_obj_as(
-                            type_=Error,  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            if _response.status_code == 500:
-                raise InternalServerError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        typing.Any,
-                        parse_obj_as(
-                            type_=typing.Any,  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            _response_json = _response.json()
-        except JSONDecodeError:
-            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
-        except ValidationError as e:
-            raise ParsingError(
-                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
-            )
-        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
-
-    def user_activity_list(
-        self, *, user_id: str, request_options: typing.Optional[RequestOptions] = None
-    ) -> HttpResponse[UserActivityListResponse]:
-        """
-        Return every **currently live** external activity for a user — every
-        integration's rows, not only yours. Expired rows are omitted even
-        before the server reaper runs. Not paginated; ordered newest
-        `startedAt` first.
-
-        The map may show fewer entries than this list (the client projection
-        keeps the top three, always including at least one DND-flagged row).
-        `.list` is the source of truth for what is still live.
-
-        See [External activity](https://developer.ro.am/docs/guides/user-activity) for display, DND,
-        TTL, and where indicators appear.
-
-        **Access:** Organization and Personal. Organization tokens may list
-        any user in the workspace. Personal tokens (OAuth or PAT) may list
-        only the token owner.
-
-        **Required scope:** `user:read.activity`. Personal Access Tokens skip
-        this check; personal-mode OAuth installs must still request the scope.
-
-        Parameters
-        ----------
-        user_id : str
-            Target user. Bare UUID, tagged `U-…` ID, or ASCII email
-            (same convention as `group.create` members). Personal tokens
-            may only pass their own user.
-
-        request_options : typing.Optional[RequestOptions]
-            Request-specific configuration.
-
-        Returns
-        -------
-        HttpResponse[UserActivityListResponse]
-            Live activities for the user. `activities` is an empty array when none are set.
-        """
-        _response = self._client_wrapper.httpx_client.request(
-            "user.activity.list",
+            "guest.badge.list",
             method="GET",
             params={
-                "userId": user_id,
+                "email": email,
+                "hostUserId": host_user_id,
+                "limit": limit,
+                "cursor": cursor,
             },
             request_options=request_options,
         )
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    UserActivityListResponse,
+                    GuestBadgeListResponse,
                     parse_obj_as(
-                        type_=UserActivityListResponse,  # type: ignore
+                        type_=GuestBadgeListResponse,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -524,103 +365,65 @@ class RawUsersClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    def messageevent_export(
-        self, *, date: str, request_options: typing.Optional[RequestOptions] = None
-    ) -> HttpResponse[str]:
+    def guest_badge_update(
+        self,
+        *,
+        email: str,
+        visit_permission: bool,
+        host_user_id: typing.Optional[str] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> HttpResponse[GuestBadge]:
         """
-        Obtain a daily message event export containing DMs and group
-        chats within your account.
+        Update `visitPermission` on an existing Guest Badge.
 
-        For customers with archival enabled (please reach out to a Roam
-        ArchiTech to get this process started), at the end of every day,
-        we export all message events for a particular day as a JSON Lines file.
-        This file contains all messages sent:
-        - by a Roam user who is a member of your organization
-        - into a chat containing (at the time of export) at least one Roam user who is a member of your organization
-        - by a bot integration that is part of your organization
+        [`guest.badge.create`](https://developer.ro.am/docs/api/guest-badge-create) is idempotent and
+        does **not** change `visitPermission` on an existing grant. Use this
+        endpoint to flip on-map visit access after create.
 
-        This file also contains message edit and deletion events that meet the above criteria.
-        We specifically exclude waves, room invitations, and other non-message content
-        (that may appear as chats within the Roam application) from the export.
+        If only one host in the workspace has granted this email, `hostUserId`
+        may be omitted. If several hosts have, pass `hostUserId` to pick which
+        grant to update (`400` `missing_parameter` otherwise). Same-host alias
+        rows are updated together.
 
-        **Access:** Organization only.
+        Personal tokens can only update badges they issued. Naming another host
+        is `403` `access_mode_not_supported`; omitting `hostUserId` when the
+        token owner has no matching grant is `404` `not_found`.
 
-        **Required scope:** `admin:compliance:read`
+        **Access:** Organization and Personal.
 
-        ### Message Event Structure
+        **Required scope:** `guest:write`. Personal Access Tokens use the
+        `pat:guests:write` group.
 
-        Each line within the file is a JSON object containing the following fields:
-        - eventType: a string that is one of “sent”, “edited”, or “deleted”
-        - chatId: a UUIDv4 identifier for a particular chat. All messages within the same chat shared the same chatId.
-        - threadTimestamp (optional): if part of a thread, the Unix epoch timestamp of the thread’s parent message in numerical format. All messages part of a thread share the same threadTimestamp.
-        - timestamp: the Unix epoch timestamp when the message was originally sent in numerical format.
-        - messageId: an internal UUIDv4 identifier as a string
-        - sender: a “Participant” object that identifiers the message sender
-        - contentType: a string that is one of the contentTypes associated with the “MessageContent” object
-        - content: a “MessageContent” object that contains the message’s content
-
-        ### Participant
-
-        A Participant is a JSON object that contains three common fields: “participantType”, “id”, and “displayName”
-        - participantType: one of “email”, “bot”, or “occupant”
-        - id: a UUID identifier for the participant
-        - displayName: the name associated with the account or an empty string if not provided
-
-        Depending on the participant type, the object also contains additional fields:
-
-        Email Participant (a human user with a Roam user account)
-        - email: the email of the participant
-
-        Bot Participant (an automated user maintained by the Roam team or created via the Roam API)
-        - roamId: the roam ID associated with the integration
-        - integrationId: a unique integration ID name provided by the bot creator
-        - botCode: a unique identifier
-
-        ### Message Content
-
-        A “MessageContent” object is a JSON object that contains the field “contentType” and,
-        depending on the content type, contains additional fields:
-
-        *Text Content* (contentType = “text”)
-        - text: the text in plaintext
-        - markdownText: the text in Markdown format
-        - attachments: A list of attachment objects
-
-        *Emoji Content* (contentType = “emoji”)
-        - text: text representation of the emoji
-        - colons: emoji in :emoji: format
-        - fileUrl: an optional field containing the URL to a custom emoji image
-
-        *Item Content* (contentType = “item”)
-        - itemUrl: the URL where the file can be downloaded from
-        - itemType: the type of item (e.g. "photo", "pdf", "blob", "video", "audio", etc.)
-
-        *Text Snippet Content* (contentType = "textSnippet")
-        - text: the content of the snippet
-        - language: the language of the snippet
-
-        *Members Changed Content* (contentType = “membersChanged”)
-        - added: a list of Participant objects corresponding to all participants added in this event
-        - removed: a list of Participant objects corresponding to all participants removed in this event
+        See [Guest Badges](https://developer.ro.am/docs/guides/guest-badges).
 
         Parameters
         ----------
-        date : str
-            The UTC date to fetch the export for in YYYY-MM-DD format.
+        email : str
+            Guest email. ASCII only.
+
+        visit_permission : bool
+            Whether the guest may visit the host on the map.
+
+        host_user_id : typing.Optional[str]
+            Host member. UUID or member email. Required when more than one
+            host has granted this email. Optional for a unique grant, and
+            for personal tokens (defaults to the token owner).
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
         Returns
         -------
-        HttpResponse[str]
-            Export file returned successfully
+        HttpResponse[GuestBadge]
+            The updated Guest Badge.
         """
         _response = self._client_wrapper.httpx_client.request(
-            "messageevent.export",
+            "guest.badge.update",
             method="POST",
             json={
-                "date": date,
+                "email": email,
+                "hostUserId": host_user_id,
+                "visitPermission": visit_permission,
             },
             headers={
                 "content-type": "application/json",
@@ -631,9 +434,9 @@ class RawUsersClient:
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    str,
+                    GuestBadge,
                     parse_obj_as(
-                        type_=str,  # type: ignore
+                        type_=GuestBadge,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -656,6 +459,186 @@ class RawUsersClient:
                         Error,
                         parse_obj_as(
                             type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 403:
+                raise ForbiddenError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 404:
+                raise NotFoundError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 405:
+                raise MethodNotAllowedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 429:
+                raise TooManyRequestsError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 500:
+                raise InternalServerError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def guest_badge_revoke(
+        self,
+        *,
+        email: str,
+        host_user_id: typing.Optional[str] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> HttpResponse[GuestBadgeRevokeResponse]:
+        """
+        Revoke Guest Badge(s) for an email.
+
+        If only one host in the workspace has granted this email, `hostUserId` may
+        be omitted. If several hosts have, pass `hostUserId` to pick which grant
+        to revoke (`400` `missing_parameter` otherwise). Same-host alias rows are
+        all revoked together.
+
+        Returns `{ "revoked": true }` when a matching grant was found and deleted,
+        or `{ "revoked": false }` when there was nothing to revoke (already gone,
+        including after the host was archived — archiving a member deletes the
+        badges they granted). Naming an archived host does not 404.
+
+        Personal tokens can only revoke badges they issued. Naming another host is
+        `403` `access_mode_not_supported`; omitting `hostUserId` when only another
+        host granted the email is a no-op (`revoked: false`).
+
+        **Access:** Organization and Personal.
+
+        **Required scope:** `guest:write`. Personal Access Tokens use the
+        `pat:guests:write` group.
+
+        See [Guest Badges](https://developer.ro.am/docs/guides/guest-badges).
+
+        Parameters
+        ----------
+        email : str
+            Guest email. ASCII only.
+
+        host_user_id : typing.Optional[str]
+            Host member. UUID or member email. Required when more than one
+            host has granted this email. Optional for a unique grant, and
+            for personal tokens (defaults to the token owner).
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[GuestBadgeRevokeResponse]
+            Revoke attempted. `revoked` is true only when a matching grant was deleted.
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            "guest.badge.revoke",
+            method="POST",
+            json={
+                "email": email,
+                "hostUserId": host_user_id,
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    GuestBadgeRevokeResponse,
+                    parse_obj_as(
+                        type_=GuestBadgeRevokeResponse,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 400:
+                raise BadRequestError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 401:
+                raise UnauthorizedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 403:
+                raise ForbiddenError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 404:
+                raise NotFoundError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -703,114 +686,73 @@ class RawUsersClient:
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
 
-class AsyncRawUsersClient:
+class AsyncRawGuestBadgesClient:
     def __init__(self, *, client_wrapper: AsyncClientWrapper):
         self._client_wrapper = client_wrapper
 
-    async def user_activity_set(
+    async def guest_badge_create(
         self,
         *,
-        user_id: str,
-        external_id: str,
-        display: UserActivityDisplay,
-        ttl_seconds: typing.Optional[int] = OMIT,
-        expires_at: typing.Optional[dt.datetime] = OMIT,
-        started_at: typing.Optional[dt.datetime] = OMIT,
-        dnd: typing.Optional[bool] = OMIT,
+        email: str,
+        host_user_id: typing.Optional[str] = OMIT,
+        visit_permission: typing.Optional[bool] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
-    ) -> AsyncHttpResponse[UserActivity]:
+    ) -> AsyncHttpResponse[GuestBadge]:
         """
-        Paint a badge (and optional glow) on a user's seat for work happening
-        outside Roam — a phone call, a browser meeting, a CRM session. Pass
-        `dnd: true` to also put their assigned office in Do Not Disturb.
+        Grant a Guest Badge so an email that is **not** a workspace member can
+        visit a host in Roam.
 
-        The integration owns the lifecycle: `set` when the session starts,
-        `clear` when it ends. Re-posting the same `externalId` is the heartbeat
-        for long-running sessions — it refreshes `expiresAt` and, unless you
-        send `startedAt`, keeps the original start time. Roam stamps expiry
-        itself (default 10 minutes, maximum 60) so a dropped "ended" webhook
-        cannot leave a permanent glow.
+        This is **not** an [On-Air event guest](https://developer.ro.am/docs/onair-api/on-air-api). It is
+        also **not** implied by [`group.add`](https://developer.ro.am/docs/api/group-add): adding an email
+        to a group does not mint a badge or send the invite. Typical onboarding is
+        `guest.badge.create` then `group.add`.
 
-        `externalId` is unique per (integration, user). Two apps can hold
-        activities on the same person at once; you can only update or clear
-        your own rows.
+        Repeating create for the same host and email returns the existing badge
+        (`visitPermission` is **not** updated) and does not re-send the invite.
+        To flip on-map access after create, use
+        [`guest.badge.update`](https://developer.ro.am/docs/api/guest-badge-update).
 
-        See [External activity](https://developer.ro.am/docs/guides/user-activity) for display, DND,
-        TTL, stacking, and where the indicator appears on the map.
+        **Access:** Organization and Personal.
+        Organization tokens require `hostUserId`. Personal tokens default to the
+        token owner; naming a different host returns `403` `access_mode_not_supported`.
 
-        Identify the user with `userId`: a bare UUID, tagged `U-…` ID, or
-        ASCII email (same convention as `group.create` members). Third-party
-        systems that only have an email do not need a UUID lookup first.
+        **Required scope:** `guest:write`. Personal Access Tokens use the
+        `pat:guests:write` group.
 
-        **Access:** Organization and Personal. Organization tokens may target
-        any user in the workspace. Personal tokens (OAuth or PAT) may target
-        only the token owner.
-
-        **Required scope:** `user:write.activity`. Personal Access Tokens skip
-        this check; personal-mode OAuth installs must still request the scope.
+        See [Guest Badges](https://developer.ro.am/docs/guides/guest-badges).
 
         Parameters
         ----------
-        user_id : str
-            Target user. Bare UUID, tagged `U-…` ID, or ASCII email
-            (same convention as `group.create` members). Personal
-            tokens may only pass their own user. Does not require
-            `user:read.email` — email is an identifier, not a
-            disclosure.
+        email : str
+            Guest email. ASCII only. Must not be a workspace member.
 
-        external_id : str
-            Caller-chosen session id, unique per integration and user.
-            Re-using it upserts the existing row (heartbeat). At most
-            128 Unicode code points.
+        host_user_id : typing.Optional[str]
+            Host member. UUID or member email — the same convention as
+            [`group.create`](https://developer.ro.am/docs/api/group-create) `members[].userId`.
+            Required for organization tokens. Optional for personal tokens
+            (defaults to the token owner).
 
-        display : UserActivityDisplay
-
-        ttl_seconds : typing.Optional[int]
-            Seconds from now until expiry. Mutually exclusive with
-            `expiresAt`. Values above 3600 are **clamped** to 60
-            minutes, not rejected. Default when both are omitted: 600
-            (10 minutes).
-
-        expires_at : typing.Optional[dt.datetime]
-            Absolute expiry (RFC3339, must be in the future). Mutually
-            exclusive with `ttlSeconds`. Instants more than 60 minutes
-            ahead are clamped to that maximum.
-
-        started_at : typing.Optional[dt.datetime]
-            Optional session start (RFC3339). Omit on heartbeats to
-            preserve the original. A future value is clamped to the
-            server's now (clock skew; also so one integration cannot
-            pin the newest-first projection slot).
-
-        dnd : typing.Optional[bool]
-            If true, this activity contributes Do Not Disturb on the
-            user's **own assigned office** until it is cleared or
-            expires. Defaults to false — a badge does not lock an
-            office unless you opt in. Stacks with Zoom/Meet auto-DND
-            and other integrations' DND-flagged rows.
+        visit_permission : typing.Optional[bool]
+            Whether the guest may visit the host on the map. Defaults to
+            `true`. Ignored on an idempotent retry of an existing grant
+            — use [`guest.badge.update`](https://developer.ro.am/docs/api/guest-badge-update)
+            to change it.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
         Returns
         -------
-        AsyncHttpResponse[UserActivity]
-            Activity saved. Body is the live item (same shape `.list` returns
-            per entry), including the server-stamped `startedAt` / `expiresAt`.
+        AsyncHttpResponse[GuestBadge]
+            Badge created, or the existing grant returned.
         """
         _response = await self._client_wrapper.httpx_client.request(
-            "user.activity.set",
+            "guest.badge.create",
             method="POST",
             json={
-                "userId": user_id,
-                "externalId": external_id,
-                "display": convert_and_respect_annotation_metadata(
-                    object_=display, annotation=UserActivityDisplay, direction="write"
-                ),
-                "ttlSeconds": ttl_seconds,
-                "expiresAt": expires_at,
-                "startedAt": started_at,
-                "dnd": dnd,
+                "email": email,
+                "hostUserId": host_user_id,
+                "visitPermission": visit_permission,
             },
             headers={
                 "content-type": "application/json",
@@ -821,9 +763,9 @@ class AsyncRawUsersClient:
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    UserActivity,
+                    GuestBadge,
                     parse_obj_as(
-                        type_=UserActivity,  # type: ignore
+                        type_=GuestBadge,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -914,199 +856,83 @@ class AsyncRawUsersClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    async def user_activity_clear(
-        self, *, user_id: str, external_id: str, request_options: typing.Optional[RequestOptions] = None
-    ) -> AsyncHttpResponse[None]:
+    async def guest_badge_list(
+        self,
+        *,
+        email: typing.Optional[str] = None,
+        host_user_id: typing.Optional[str] = None,
+        limit: typing.Optional[int] = None,
+        cursor: typing.Optional[str] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> AsyncHttpResponse[GuestBadgeListResponse]:
         """
-        End an activity previously created with [`user.activity.set`](https://developer.ro.am/docs/api/user-activity-set).
-        The row is keyed by this integration plus `userId` and `externalId` —
-        you cannot clear another app's activity.
+        List issued Guest Badges.
 
-        Clearing a missing, already-cleared, or already-expired `externalId`
-        still returns **204**. Integrations retry "session ended" webhooks, and
-        the row may have expired in the meantime.
+        Organization tokens return every issued badge in the workspace. Personal
+        tokens return only badges the token owner issued. This is the issued
+        (host) view — the same rows `guest.badge.create` returns — not the
+        guest's hidden-inbox view.
 
-        See [External activity](https://developer.ro.am/docs/guides/user-activity) for TTL, DND
-        stacking, and what happens on the map when the last activity clears.
+        Filter with `email` (alias-aware) and/or `hostUserId` (UUID or member
+        email). Paginate with `limit` / `cursor` (default 50, max 100). Results
+        are sorted by `(hostUserId, email)`.
 
-        **Access:** Organization and Personal. Organization tokens may target
-        any user in the workspace. Personal tokens (OAuth or PAT) may target
-        only the token owner.
+        Organization keys that only have `guest:write` must also request
+        `guest:read` to call list. Personal Access Tokens with `pat:guests:write`
+        already include `guest:read`.
 
-        **Required scope:** `user:write.activity`. Personal Access Tokens skip
-        this check; personal-mode OAuth installs must still request the scope.
+        **Access:** Organization and Personal.
+        Personal tokens naming a different host return `403`
+        `access_mode_not_supported`.
+
+        **Required scope:** `guest:read`. Personal Access Tokens use the
+        `pat:guests:write` group.
+
+        See [Guest Badges](https://developer.ro.am/docs/guides/guest-badges).
 
         Parameters
         ----------
-        user_id : str
-            Target user. Bare UUID, tagged `U-…` ID, or ASCII email
-            (same convention as `group.create` members). Personal
-            tokens may only pass their own user.
+        email : typing.Optional[str]
+            Guest email. ASCII only. Matches the stored address and its verified
+            domain aliases.
 
-        external_id : str
-            The `externalId` previously passed to `user.activity.set`.
+        host_user_id : typing.Optional[str]
+            Host member. UUID or member email — the same convention as
+            [`group.create`](https://developer.ro.am/docs/api/group-create) `members[].userId`.
+            Archived hosts may be named (they typically have no remaining grants).
+            Personal tokens may only pass the token owner.
+
+        limit : typing.Optional[int]
+            Number of badges to return per page (default 50, max 100).
+
+        cursor : typing.Optional[str]
+            Opaque pagination cursor from a previous response's `nextCursor`. Do not construct cursors manually.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
         Returns
         -------
-        AsyncHttpResponse[None]
+        AsyncHttpResponse[GuestBadgeListResponse]
+            Issued Guest Badges for this page.
         """
         _response = await self._client_wrapper.httpx_client.request(
-            "user.activity.clear",
-            method="POST",
-            json={
-                "userId": user_id,
-                "externalId": external_id,
-            },
-            headers={
-                "content-type": "application/json",
-            },
-            request_options=request_options,
-            omit=OMIT,
-        )
-        try:
-            if 200 <= _response.status_code < 300:
-                return AsyncHttpResponse(response=_response, data=None)
-            if _response.status_code == 400:
-                raise BadRequestError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        Error,
-                        parse_obj_as(
-                            type_=Error,  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            if _response.status_code == 401:
-                raise UnauthorizedError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        Error,
-                        parse_obj_as(
-                            type_=Error,  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            if _response.status_code == 403:
-                raise ForbiddenError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        Error,
-                        parse_obj_as(
-                            type_=Error,  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            if _response.status_code == 404:
-                raise NotFoundError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        typing.Any,
-                        parse_obj_as(
-                            type_=typing.Any,  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            if _response.status_code == 405:
-                raise MethodNotAllowedError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        Error,
-                        parse_obj_as(
-                            type_=Error,  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            if _response.status_code == 429:
-                raise TooManyRequestsError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        Error,
-                        parse_obj_as(
-                            type_=Error,  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            if _response.status_code == 500:
-                raise InternalServerError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        typing.Any,
-                        parse_obj_as(
-                            type_=typing.Any,  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            _response_json = _response.json()
-        except JSONDecodeError:
-            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
-        except ValidationError as e:
-            raise ParsingError(
-                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
-            )
-        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
-
-    async def user_activity_list(
-        self, *, user_id: str, request_options: typing.Optional[RequestOptions] = None
-    ) -> AsyncHttpResponse[UserActivityListResponse]:
-        """
-        Return every **currently live** external activity for a user — every
-        integration's rows, not only yours. Expired rows are omitted even
-        before the server reaper runs. Not paginated; ordered newest
-        `startedAt` first.
-
-        The map may show fewer entries than this list (the client projection
-        keeps the top three, always including at least one DND-flagged row).
-        `.list` is the source of truth for what is still live.
-
-        See [External activity](https://developer.ro.am/docs/guides/user-activity) for display, DND,
-        TTL, and where indicators appear.
-
-        **Access:** Organization and Personal. Organization tokens may list
-        any user in the workspace. Personal tokens (OAuth or PAT) may list
-        only the token owner.
-
-        **Required scope:** `user:read.activity`. Personal Access Tokens skip
-        this check; personal-mode OAuth installs must still request the scope.
-
-        Parameters
-        ----------
-        user_id : str
-            Target user. Bare UUID, tagged `U-…` ID, or ASCII email
-            (same convention as `group.create` members). Personal tokens
-            may only pass their own user.
-
-        request_options : typing.Optional[RequestOptions]
-            Request-specific configuration.
-
-        Returns
-        -------
-        AsyncHttpResponse[UserActivityListResponse]
-            Live activities for the user. `activities` is an empty array when none are set.
-        """
-        _response = await self._client_wrapper.httpx_client.request(
-            "user.activity.list",
+            "guest.badge.list",
             method="GET",
             params={
-                "userId": user_id,
+                "email": email,
+                "hostUserId": host_user_id,
+                "limit": limit,
+                "cursor": cursor,
             },
             request_options=request_options,
         )
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    UserActivityListResponse,
+                    GuestBadgeListResponse,
                     parse_obj_as(
-                        type_=UserActivityListResponse,  # type: ignore
+                        type_=GuestBadgeListResponse,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -1197,103 +1023,65 @@ class AsyncRawUsersClient:
             )
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    async def messageevent_export(
-        self, *, date: str, request_options: typing.Optional[RequestOptions] = None
-    ) -> AsyncHttpResponse[str]:
+    async def guest_badge_update(
+        self,
+        *,
+        email: str,
+        visit_permission: bool,
+        host_user_id: typing.Optional[str] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> AsyncHttpResponse[GuestBadge]:
         """
-        Obtain a daily message event export containing DMs and group
-        chats within your account.
+        Update `visitPermission` on an existing Guest Badge.
 
-        For customers with archival enabled (please reach out to a Roam
-        ArchiTech to get this process started), at the end of every day,
-        we export all message events for a particular day as a JSON Lines file.
-        This file contains all messages sent:
-        - by a Roam user who is a member of your organization
-        - into a chat containing (at the time of export) at least one Roam user who is a member of your organization
-        - by a bot integration that is part of your organization
+        [`guest.badge.create`](https://developer.ro.am/docs/api/guest-badge-create) is idempotent and
+        does **not** change `visitPermission` on an existing grant. Use this
+        endpoint to flip on-map visit access after create.
 
-        This file also contains message edit and deletion events that meet the above criteria.
-        We specifically exclude waves, room invitations, and other non-message content
-        (that may appear as chats within the Roam application) from the export.
+        If only one host in the workspace has granted this email, `hostUserId`
+        may be omitted. If several hosts have, pass `hostUserId` to pick which
+        grant to update (`400` `missing_parameter` otherwise). Same-host alias
+        rows are updated together.
 
-        **Access:** Organization only.
+        Personal tokens can only update badges they issued. Naming another host
+        is `403` `access_mode_not_supported`; omitting `hostUserId` when the
+        token owner has no matching grant is `404` `not_found`.
 
-        **Required scope:** `admin:compliance:read`
+        **Access:** Organization and Personal.
 
-        ### Message Event Structure
+        **Required scope:** `guest:write`. Personal Access Tokens use the
+        `pat:guests:write` group.
 
-        Each line within the file is a JSON object containing the following fields:
-        - eventType: a string that is one of “sent”, “edited”, or “deleted”
-        - chatId: a UUIDv4 identifier for a particular chat. All messages within the same chat shared the same chatId.
-        - threadTimestamp (optional): if part of a thread, the Unix epoch timestamp of the thread’s parent message in numerical format. All messages part of a thread share the same threadTimestamp.
-        - timestamp: the Unix epoch timestamp when the message was originally sent in numerical format.
-        - messageId: an internal UUIDv4 identifier as a string
-        - sender: a “Participant” object that identifiers the message sender
-        - contentType: a string that is one of the contentTypes associated with the “MessageContent” object
-        - content: a “MessageContent” object that contains the message’s content
-
-        ### Participant
-
-        A Participant is a JSON object that contains three common fields: “participantType”, “id”, and “displayName”
-        - participantType: one of “email”, “bot”, or “occupant”
-        - id: a UUID identifier for the participant
-        - displayName: the name associated with the account or an empty string if not provided
-
-        Depending on the participant type, the object also contains additional fields:
-
-        Email Participant (a human user with a Roam user account)
-        - email: the email of the participant
-
-        Bot Participant (an automated user maintained by the Roam team or created via the Roam API)
-        - roamId: the roam ID associated with the integration
-        - integrationId: a unique integration ID name provided by the bot creator
-        - botCode: a unique identifier
-
-        ### Message Content
-
-        A “MessageContent” object is a JSON object that contains the field “contentType” and,
-        depending on the content type, contains additional fields:
-
-        *Text Content* (contentType = “text”)
-        - text: the text in plaintext
-        - markdownText: the text in Markdown format
-        - attachments: A list of attachment objects
-
-        *Emoji Content* (contentType = “emoji”)
-        - text: text representation of the emoji
-        - colons: emoji in :emoji: format
-        - fileUrl: an optional field containing the URL to a custom emoji image
-
-        *Item Content* (contentType = “item”)
-        - itemUrl: the URL where the file can be downloaded from
-        - itemType: the type of item (e.g. "photo", "pdf", "blob", "video", "audio", etc.)
-
-        *Text Snippet Content* (contentType = "textSnippet")
-        - text: the content of the snippet
-        - language: the language of the snippet
-
-        *Members Changed Content* (contentType = “membersChanged”)
-        - added: a list of Participant objects corresponding to all participants added in this event
-        - removed: a list of Participant objects corresponding to all participants removed in this event
+        See [Guest Badges](https://developer.ro.am/docs/guides/guest-badges).
 
         Parameters
         ----------
-        date : str
-            The UTC date to fetch the export for in YYYY-MM-DD format.
+        email : str
+            Guest email. ASCII only.
+
+        visit_permission : bool
+            Whether the guest may visit the host on the map.
+
+        host_user_id : typing.Optional[str]
+            Host member. UUID or member email. Required when more than one
+            host has granted this email. Optional for a unique grant, and
+            for personal tokens (defaults to the token owner).
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
         Returns
         -------
-        AsyncHttpResponse[str]
-            Export file returned successfully
+        AsyncHttpResponse[GuestBadge]
+            The updated Guest Badge.
         """
         _response = await self._client_wrapper.httpx_client.request(
-            "messageevent.export",
+            "guest.badge.update",
             method="POST",
             json={
-                "date": date,
+                "email": email,
+                "hostUserId": host_user_id,
+                "visitPermission": visit_permission,
             },
             headers={
                 "content-type": "application/json",
@@ -1304,9 +1092,9 @@ class AsyncRawUsersClient:
         try:
             if 200 <= _response.status_code < 300:
                 _data = typing.cast(
-                    str,
+                    GuestBadge,
                     parse_obj_as(
-                        type_=str,  # type: ignore
+                        type_=GuestBadge,  # type: ignore
                         object_=_response.json(),
                     ),
                 )
@@ -1329,6 +1117,186 @@ class AsyncRawUsersClient:
                         Error,
                         parse_obj_as(
                             type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 403:
+                raise ForbiddenError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 404:
+                raise NotFoundError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 405:
+                raise MethodNotAllowedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 429:
+                raise TooManyRequestsError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 500:
+                raise InternalServerError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def guest_badge_revoke(
+        self,
+        *,
+        email: str,
+        host_user_id: typing.Optional[str] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> AsyncHttpResponse[GuestBadgeRevokeResponse]:
+        """
+        Revoke Guest Badge(s) for an email.
+
+        If only one host in the workspace has granted this email, `hostUserId` may
+        be omitted. If several hosts have, pass `hostUserId` to pick which grant
+        to revoke (`400` `missing_parameter` otherwise). Same-host alias rows are
+        all revoked together.
+
+        Returns `{ "revoked": true }` when a matching grant was found and deleted,
+        or `{ "revoked": false }` when there was nothing to revoke (already gone,
+        including after the host was archived — archiving a member deletes the
+        badges they granted). Naming an archived host does not 404.
+
+        Personal tokens can only revoke badges they issued. Naming another host is
+        `403` `access_mode_not_supported`; omitting `hostUserId` when only another
+        host granted the email is a no-op (`revoked: false`).
+
+        **Access:** Organization and Personal.
+
+        **Required scope:** `guest:write`. Personal Access Tokens use the
+        `pat:guests:write` group.
+
+        See [Guest Badges](https://developer.ro.am/docs/guides/guest-badges).
+
+        Parameters
+        ----------
+        email : str
+            Guest email. ASCII only.
+
+        host_user_id : typing.Optional[str]
+            Host member. UUID or member email. Required when more than one
+            host has granted this email. Optional for a unique grant, and
+            for personal tokens (defaults to the token owner).
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[GuestBadgeRevokeResponse]
+            Revoke attempted. `revoked` is true only when a matching grant was deleted.
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            "guest.badge.revoke",
+            method="POST",
+            json={
+                "email": email,
+                "hostUserId": host_user_id,
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    GuestBadgeRevokeResponse,
+                    parse_obj_as(
+                        type_=GuestBadgeRevokeResponse,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 400:
+                raise BadRequestError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 401:
+                raise UnauthorizedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 403:
+                raise ForbiddenError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 404:
+                raise NotFoundError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),

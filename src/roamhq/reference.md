@@ -3168,6 +3168,10 @@ your own rows.
 See [External activity](https://developer.ro.am/docs/guides/user-activity) for display, DND,
 TTL, stacking, and where the indicator appears on the map.
 
+Identify the user with `userId`: a bare UUID, tagged `U-…` ID, or
+ASCII email (same convention as `group.create` members). Third-party
+systems that only have an email do not need a UUID lookup first.
+
 **Access:** Organization and Personal. Organization tokens may target
 any user in the workspace. Personal tokens (OAuth or PAT) may target
 only the token owner.
@@ -3197,7 +3201,7 @@ client = RoamClient(
 )
 
 client.users.user_activity_set(
-    user_id="0cc74785-e31e-4403-aa5e-0cc7c1897e66",
+    user_id="ada@example.com",
     external_id="justcall:call:CA123",
     display=UserActivityDisplay(
         emoji="📞",
@@ -3225,8 +3229,11 @@ client.users.user_activity_set(
 
 **user_id:** `str` 
 
-Target user. Bare or tagged UUID. Personal tokens may only
-pass their own user.
+Target user. Bare UUID, tagged `U-…` ID, or ASCII email
+(same convention as `group.create` members). Personal
+tokens may only pass their own user. Does not require
+`user:read.email` — email is an identifier, not a
+disclosure.
     
 </dd>
 </dl>
@@ -3370,7 +3377,7 @@ client = RoamClient(
 )
 
 client.users.user_activity_clear(
-    user_id="0cc74785-e31e-4403-aa5e-0cc7c1897e66",
+    user_id="ada@example.com",
     external_id="justcall:call:CA123",
 )
 
@@ -3390,8 +3397,9 @@ client.users.user_activity_clear(
 
 **user_id:** `str` 
 
-Target user. Bare or tagged UUID. Personal tokens may only
-pass their own user.
+Target user. Bare UUID, tagged `U-…` ID, or ASCII email
+(same convention as `group.create` members). Personal
+tokens may only pass their own user.
     
 </dd>
 </dl>
@@ -3491,8 +3499,9 @@ client.users.user_activity_list(
 
 **user_id:** `str` 
 
-Target user. Bare or tagged UUID. Personal tokens may only pass
-their own user.
+Target user. Bare UUID, tagged `U-…` ID, or ASCII email
+(same convention as `group.create` members). Personal tokens
+may only pass their own user.
     
 </dd>
 </dl>
@@ -5972,6 +5981,9 @@ mode, where only admins may change settings. Otherwise, all members have
 that capability.
 
 Groups require at least one member. Users can be specified by user ID or email address.
+Unrecognized emails are invited as group members only — they do not receive a
+[Guest Badge](https://developer.ro.am/docs/guides/guest-badges) unless you also call
+[`guest.badge.create`](https://developer.ro.am/docs/api/guest-badge-create).
 
 **Required scope:** `group:write`
 </dd>
@@ -6362,6 +6374,8 @@ Add one or more group members with specified roles.
 
 Members can be specified by user ID or email address. Each member must be assigned a role (member or admin).
 
+Adding an unrecognized email does **not** grant a [Guest Badge](https://developer.ro.am/docs/guides/guest-badges). Use [`guest.badge.create`](https://developer.ro.am/docs/api/guest-badge-create) first if the person is not a workspace member.
+
 Apps may add members to a group if one of the following conditions is true:
 1. It is a public group in their Roam.
 2. They are a member of the group.
@@ -6706,6 +6720,473 @@ client.groups.list()
 </dl>
 </details>
 
+## Guest Badges
+<details><summary><code>client.guest_badges.<a href="src/roamhq/guest_badges/client.py">guest_badge_create</a>(...) -> GuestBadge</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+Grant a Guest Badge so an email that is **not** a workspace member can
+visit a host in Roam.
+
+This is **not** an [On-Air event guest](https://developer.ro.am/docs/onair-api/on-air-api). It is
+also **not** implied by [`group.add`](https://developer.ro.am/docs/api/group-add): adding an email
+to a group does not mint a badge or send the invite. Typical onboarding is
+`guest.badge.create` then `group.add`.
+
+Repeating create for the same host and email returns the existing badge
+(`visitPermission` is **not** updated) and does not re-send the invite.
+To flip on-map access after create, use
+[`guest.badge.update`](https://developer.ro.am/docs/api/guest-badge-update).
+
+**Access:** Organization and Personal.
+Organization tokens require `hostUserId`. Personal tokens default to the
+token owner; naming a different host returns `403` `access_mode_not_supported`.
+
+**Required scope:** `guest:write`. Personal Access Tokens use the
+`pat:guests:write` group.
+
+See [Guest Badges](https://developer.ro.am/docs/guides/guest-badges).
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```python
+from roamhq import RoamClient
+from roamhq.environment import RoamClientEnvironment
+
+client = RoamClient(
+    token="<token>",
+    environment=RoamClientEnvironment.DEFAULT,
+)
+
+client.guest_badges.guest_badge_create(
+    email="alex@client.example",
+    host_user_id="3f1c0b2a-8d4e-4c91-9a7b-2e6f1d8c0a11",
+)
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**email:** `str` — Guest email. ASCII only. Must not be a workspace member.
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**host_user_id:** `typing.Optional[str]` 
+
+Host member. UUID or member email — the same convention as
+[`group.create`](https://developer.ro.am/docs/api/group-create) `members[].userId`.
+Required for organization tokens. Optional for personal tokens
+(defaults to the token owner).
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**visit_permission:** `typing.Optional[bool]` 
+
+Whether the guest may visit the host on the map. Defaults to
+`true`. Ignored on an idempotent retry of an existing grant
+— use [`guest.badge.update`](https://developer.ro.am/docs/api/guest-badge-update)
+to change it.
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**request_options:** `typing.Optional[RequestOptions]` — Request-specific configuration.
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.guest_badges.<a href="src/roamhq/guest_badges/client.py">guest_badge_list</a>(...) -> GuestBadgeListResponse</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+List issued Guest Badges.
+
+Organization tokens return every issued badge in the workspace. Personal
+tokens return only badges the token owner issued. This is the issued
+(host) view — the same rows `guest.badge.create` returns — not the
+guest's hidden-inbox view.
+
+Filter with `email` (alias-aware) and/or `hostUserId` (UUID or member
+email). Paginate with `limit` / `cursor` (default 50, max 100). Results
+are sorted by `(hostUserId, email)`.
+
+Organization keys that only have `guest:write` must also request
+`guest:read` to call list. Personal Access Tokens with `pat:guests:write`
+already include `guest:read`.
+
+**Access:** Organization and Personal.
+Personal tokens naming a different host return `403`
+`access_mode_not_supported`.
+
+**Required scope:** `guest:read`. Personal Access Tokens use the
+`pat:guests:write` group.
+
+See [Guest Badges](https://developer.ro.am/docs/guides/guest-badges).
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```python
+from roamhq import RoamClient
+from roamhq.environment import RoamClientEnvironment
+
+client = RoamClient(
+    token="<token>",
+    environment=RoamClientEnvironment.DEFAULT,
+)
+
+client.guest_badges.guest_badge_list()
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**email:** `typing.Optional[str]` 
+
+Guest email. ASCII only. Matches the stored address and its verified
+domain aliases.
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**host_user_id:** `typing.Optional[str]` 
+
+Host member. UUID or member email — the same convention as
+[`group.create`](https://developer.ro.am/docs/api/group-create) `members[].userId`.
+Archived hosts may be named (they typically have no remaining grants).
+Personal tokens may only pass the token owner.
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**limit:** `typing.Optional[int]` — Number of badges to return per page (default 50, max 100).
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**cursor:** `typing.Optional[str]` — Opaque pagination cursor from a previous response's `nextCursor`. Do not construct cursors manually.
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**request_options:** `typing.Optional[RequestOptions]` — Request-specific configuration.
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.guest_badges.<a href="src/roamhq/guest_badges/client.py">guest_badge_update</a>(...) -> GuestBadge</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+Update `visitPermission` on an existing Guest Badge.
+
+[`guest.badge.create`](https://developer.ro.am/docs/api/guest-badge-create) is idempotent and
+does **not** change `visitPermission` on an existing grant. Use this
+endpoint to flip on-map visit access after create.
+
+If only one host in the workspace has granted this email, `hostUserId`
+may be omitted. If several hosts have, pass `hostUserId` to pick which
+grant to update (`400` `missing_parameter` otherwise). Same-host alias
+rows are updated together.
+
+Personal tokens can only update badges they issued. Naming another host
+is `403` `access_mode_not_supported`; omitting `hostUserId` when the
+token owner has no matching grant is `404` `not_found`.
+
+**Access:** Organization and Personal.
+
+**Required scope:** `guest:write`. Personal Access Tokens use the
+`pat:guests:write` group.
+
+See [Guest Badges](https://developer.ro.am/docs/guides/guest-badges).
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```python
+from roamhq import RoamClient
+from roamhq.environment import RoamClientEnvironment
+
+client = RoamClient(
+    token="<token>",
+    environment=RoamClientEnvironment.DEFAULT,
+)
+
+client.guest_badges.guest_badge_update(
+    email="alex@client.example",
+    host_user_id="3f1c0b2a-8d4e-4c91-9a7b-2e6f1d8c0a11",
+    visit_permission=False,
+)
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**email:** `str` — Guest email. ASCII only.
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**visit_permission:** `bool` — Whether the guest may visit the host on the map.
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**host_user_id:** `typing.Optional[str]` 
+
+Host member. UUID or member email. Required when more than one
+host has granted this email. Optional for a unique grant, and
+for personal tokens (defaults to the token owner).
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**request_options:** `typing.Optional[RequestOptions]` — Request-specific configuration.
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.guest_badges.<a href="src/roamhq/guest_badges/client.py">guest_badge_revoke</a>(...) -> GuestBadgeRevokeResponse</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+Revoke Guest Badge(s) for an email.
+
+If only one host in the workspace has granted this email, `hostUserId` may
+be omitted. If several hosts have, pass `hostUserId` to pick which grant
+to revoke (`400` `missing_parameter` otherwise). Same-host alias rows are
+all revoked together.
+
+Returns `{ "revoked": true }` when a matching grant was found and deleted,
+or `{ "revoked": false }` when there was nothing to revoke (already gone,
+including after the host was archived — archiving a member deletes the
+badges they granted). Naming an archived host does not 404.
+
+Personal tokens can only revoke badges they issued. Naming another host is
+`403` `access_mode_not_supported`; omitting `hostUserId` when only another
+host granted the email is a no-op (`revoked: false`).
+
+**Access:** Organization and Personal.
+
+**Required scope:** `guest:write`. Personal Access Tokens use the
+`pat:guests:write` group.
+
+See [Guest Badges](https://developer.ro.am/docs/guides/guest-badges).
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```python
+from roamhq import RoamClient
+from roamhq.environment import RoamClientEnvironment
+
+client = RoamClient(
+    token="<token>",
+    environment=RoamClientEnvironment.DEFAULT,
+)
+
+client.guest_badges.guest_badge_revoke(
+    email="alex@client.example",
+)
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**email:** `str` — Guest email. ASCII only.
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**host_user_id:** `typing.Optional[str]` 
+
+Host member. UUID or member email. Required when more than one
+host has granted this email. Optional for a unique grant, and
+for personal tokens (defaults to the token owner).
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**request_options:** `typing.Optional[RequestOptions]` — Request-specific configuration.
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
 ## Token
 <details><summary><code>client.token.<a href="src/roamhq/token/client.py">info</a>() -> InfoTokenResponse</code></summary>
 <dl>
@@ -6958,7 +7439,21 @@ v0-only — sending them here returns `400` / `Unrecognized event`.
 Roam does not probe the destination URL when you subscribe — the
 subscription is created immediately and the first delivery is a real event.
 
-See the [Webhooks overview](https://developer.ro.am/docs/webhooks/webhooks) for the full list of event names and their filters.
+Optional `filter` limits which occurrences are delivered. Which keys are
+valid depends on `event` — see that event's page and the
+[Event Filters](https://developer.ro.am/docs/webhooks/webhooks#event-filters) table. Omit
+`filter` to receive every occurrence. An empty object (`{}`) is rejected,
+as is a filter that does not apply to the event.
+
+**DMs only:**
+
+```json
+{
+  "url": "https://example.com/hooks/messages",
+  "event": "chat.message",
+  "filter": { "chatType": "dm" }
+}
+```
 
 **Required scope:** `webhook:write`
 </dd>
@@ -6975,7 +7470,7 @@ See the [Webhooks overview](https://developer.ro.am/docs/webhooks/webhooks) for 
 <dd>
 
 ```python
-from roamhq import RoamClient, WebhookSubscriptionFilter
+from roamhq import RoamClient
 from roamhq.environment import RoamClientEnvironment
 
 client = RoamClient(
@@ -6986,9 +7481,6 @@ client = RoamClient(
 client.webhook.subscribe(
     url="https://example.com/hooks/messages",
     event="chat.message",
-    filter=WebhookSubscriptionFilter(
-        mention=True,
-    ),
 )
 
 ```
@@ -7022,6 +7514,11 @@ client.webhook.subscribe(
 <dd>
 
 **filter:** `typing.Optional[WebhookSubscriptionFilter]` 
+
+Optional event-specific filter. Which keys are valid depends on `event`
+(see the schema). Omit to receive every occurrence; `{}` and `null` are
+rejected rather than treated as "omitted". Example for DMs only:
+`{"chatType": "dm"}`.
     
 </dd>
 </dl>
