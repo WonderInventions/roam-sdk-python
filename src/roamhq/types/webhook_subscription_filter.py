@@ -14,7 +14,20 @@ from .webhook_subscription_filter_status import WebhookSubscriptionFilterStatus
 
 class WebhookSubscriptionFilter(UniversalBaseModel):
     """
-    Event-specific filter to limit webhook notifications. Different properties apply to different events.
+    Event-specific filter passed as `filter` on `/webhook.subscribe`. Omit the
+    field to receive every occurrence of the event. A present but empty filter is
+    rejected — both `{}` and `null`.
+
+    Which properties apply depends on `event`:
+
+    - `chat.message`: `chatType` (`dm` or `group`) and/or `mention`
+    - `chat.reaction`: `names`
+    - `meeting.ended`: `hasVideo` (`true` only)
+    - `onair.event.created` / `updated` / `canceled` and `onair.guest.added`: `eventId`
+    - `onair.guest.rsvp`: `eventId` and/or `status`
+    - all other events: do not accept a filter
+
+    Example — DMs only: `{"chatType": "dm"}`.
     """
 
     chat_type: typing_extensions.Annotated[
@@ -22,16 +35,21 @@ class WebhookSubscriptionFilter(UniversalBaseModel):
         FieldMetadata(alias="chatType"),
         pydantic.Field(
             alias="chatType",
-            description="For `chat.message`: restrict to direct messages (`dm`) or group messages (`group`).",
+            description="For `chat.message`: restrict to direct messages (`dm`, 1:1 and\nmulti-person) or group messages (`group`, including meeting channels).\nSame vocabulary as `data.chatType` on the delivered payload.",
         ),
     ] = None
     """
-    For `chat.message`: restrict to direct messages (`dm`) or group messages (`group`).
+    For `chat.message`: restrict to direct messages (`dm`, 1:1 and
+    multi-person) or group messages (`group`, including meeting channels).
+    Same vocabulary as `data.chatType` on the delivered payload.
     """
 
     mention: typing.Optional[bool] = pydantic.Field(default=None)
     """
-    For `chat.message`: restrict to messages that @mention your app.
+    For `chat.message`: restrict to messages that @mention your app. Only
+    `true` constrains anything, so `{"mention": false}` on its own is
+    rejected like `{}`; alongside another key (`{"chatType": "dm",
+    "mention": false}`) it is accepted and ignored.
     """
 
     names: typing.Optional[typing.List[str]] = pydantic.Field(default=None)

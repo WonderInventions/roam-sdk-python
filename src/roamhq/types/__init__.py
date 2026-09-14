@@ -28,6 +28,7 @@ if typing.TYPE_CHECKING:
     from .group_member import GroupMember
     from .group_member_role import GroupMemberRole
     from .group_type import GroupType
+    from .guest_badge import GuestBadge
     from .lobby_booking import LobbyBooking
     from .lobby_booking_host import LobbyBookingHost
     from .lobby_booking_invitee import LobbyBookingInvitee
@@ -55,6 +56,8 @@ if typing.TYPE_CHECKING:
     from .user_type import UserType
     from .user_will_return import UserWillReturn
     from .webhook import Webhook
+    from .webhook_destination import WebhookDestination
+    from .webhook_destination_type import WebhookDestinationType
     from .webhook_event import WebhookEvent
     from .webhook_subscription_filter import WebhookSubscriptionFilter
     from .webhook_subscription_filter_chat_type import WebhookSubscriptionFilterChatType
@@ -80,6 +83,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "GroupMember": ".group_member",
     "GroupMemberRole": ".group_member_role",
     "GroupType": ".group_type",
+    "GuestBadge": ".guest_badge",
     "LobbyBooking": ".lobby_booking",
     "LobbyBookingHost": ".lobby_booking_host",
     "LobbyBookingInvitee": ".lobby_booking_invitee",
@@ -107,6 +111,8 @@ _dynamic_imports: typing.Dict[str, str] = {
     "UserType": ".user_type",
     "UserWillReturn": ".user_will_return",
     "Webhook": ".webhook",
+    "WebhookDestination": ".webhook_destination",
+    "WebhookDestinationType": ".webhook_destination_type",
     "WebhookEvent": ".webhook_event",
     "WebhookSubscriptionFilter": ".webhook_subscription_filter",
     "WebhookSubscriptionFilterChatType": ".webhook_subscription_filter_chat_type",
@@ -156,6 +162,7 @@ __all__ = [
     "GroupMember",
     "GroupMemberRole",
     "GroupType",
+    "GuestBadge",
     "LobbyBooking",
     "LobbyBookingHost",
     "LobbyBookingInvitee",
@@ -183,6 +190,8 @@ __all__ = [
     "UserType",
     "UserWillReturn",
     "Webhook",
+    "WebhookDestination",
+    "WebhookDestinationType",
     "WebhookEvent",
     "WebhookSubscriptionFilter",
     "WebhookSubscriptionFilterChatType",

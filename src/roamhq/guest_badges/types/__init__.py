@@ -8,23 +8,11 @@ import typing
 from importlib import import_module
 
 if typing.TYPE_CHECKING:
-    from .types import (
-        DeliveriesWebhookResponse,
-        DeliveriesWebhookResponseDeliveriesItem,
-        ListWebhookResponse,
-        ListWebhookResponseWebhooksItem,
-        WebhookSubscriptionRequestDestination,
-        WebhookSubscriptionRequestDestinationType,
-        WebhookSubscriptionRequestEvent,
-    )
+    from .guest_badge_list_response import GuestBadgeListResponse
+    from .guest_badge_revoke_response import GuestBadgeRevokeResponse
 _dynamic_imports: typing.Dict[str, str] = {
-    "DeliveriesWebhookResponse": ".types",
-    "DeliveriesWebhookResponseDeliveriesItem": ".types",
-    "ListWebhookResponse": ".types",
-    "ListWebhookResponseWebhooksItem": ".types",
-    "WebhookSubscriptionRequestDestination": ".types",
-    "WebhookSubscriptionRequestDestinationType": ".types",
-    "WebhookSubscriptionRequestEvent": ".types",
+    "GuestBadgeListResponse": ".guest_badge_list_response",
+    "GuestBadgeRevokeResponse": ".guest_badge_revoke_response",
 }
 
 
@@ -49,12 +37,4 @@ def __dir__():
     return sorted(lazy_attrs)
 
 
-__all__ = [
-    "DeliveriesWebhookResponse",
-    "DeliveriesWebhookResponseDeliveriesItem",
-    "ListWebhookResponse",
-    "ListWebhookResponseWebhooksItem",
-    "WebhookSubscriptionRequestDestination",
-    "WebhookSubscriptionRequestDestinationType",
-    "WebhookSubscriptionRequestEvent",
-]
+__all__ = ["GuestBadgeListResponse", "GuestBadgeRevokeResponse"]

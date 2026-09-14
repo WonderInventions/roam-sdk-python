@@ -9,6 +9,7 @@ import pydantic
 import typing_extensions
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
 from ..core.serialization import FieldMetadata
+from .webhook_destination import WebhookDestination
 from .webhook_event import WebhookEvent
 from .webhook_subscription_filter import WebhookSubscriptionFilter
 
@@ -32,6 +33,13 @@ class Webhook(UniversalBaseModel):
     filter: typing.Optional[WebhookSubscriptionFilter] = pydantic.Field(default=None)
     """
     Event-specific filter applied to the subscription.
+    """
+
+    destination: typing.Optional[WebhookDestination] = pydantic.Field(default=None)
+    """
+    Delivery authentication. Omitted for Standard Webhooks (the default).
+    `type` is `grok_bot` when the subscription was created with
+    `destination.type=grok_bot`. The sender key is never returned.
     """
 
     dynamic: bool = pydantic.Field()

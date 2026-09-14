@@ -22,6 +22,7 @@ from ..types.webhook import Webhook
 from ..types.webhook_subscription_filter import WebhookSubscriptionFilter
 from .types.deliveries_webhook_response import DeliveriesWebhookResponse
 from .types.list_webhook_response import ListWebhookResponse
+from .types.webhook_subscription_request_destination import WebhookSubscriptionRequestDestination
 from .types.webhook_subscription_request_event import WebhookSubscriptionRequestEvent
 from pydantic import ValidationError
 
@@ -121,6 +122,7 @@ class RawWebhookClient:
         event: WebhookSubscriptionRequestEvent,
         filter: typing.Optional[WebhookSubscriptionFilter] = OMIT,
         api_version: typing.Optional[str] = OMIT,
+        destination: typing.Optional[WebhookSubscriptionRequestDestination] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[Webhook]:
         """
@@ -137,7 +139,37 @@ class RawWebhookClient:
         Roam does not probe the destination URL when you subscribe — the
         subscription is created immediately and the first delivery is a real event.
 
-        See the [Webhooks overview](https://developer.ro.am/docs/webhooks/webhooks) for the full list of event names and their filters.
+        Optional `filter` limits which occurrences are delivered. Which keys are
+        valid depends on `event` — see that event's page and the
+        [Event Filters](https://developer.ro.am/docs/webhooks/webhooks#event-filters) table. Omit
+        `filter` to receive every occurrence. An empty object (`{}`) is rejected,
+        as is a filter that does not apply to the event.
+
+        **DMs only:**
+
+        ```json
+        {
+          "url": "https://example.com/hooks/messages",
+          "event": "chat.message",
+          "filter": { "chatType": "dm" }
+        }
+        ```
+
+        **Grok Bot routine** (no ngrok). `destination.token` is write-only — list
+        and subscribe responses echo `destination.type` only. See
+        [Grok](https://developer.ro.am/docs/integrations/grok).
+
+        ```json
+        {
+          "url": "https://api2.cursor.sh/automations/webhook/<id>",
+          "event": "chat.message",
+          "filter": { "self": true },
+          "destination": {
+            "type": "grok_bot",
+            "token": "<Grok routine sender key or whsec_…>"
+          }
+        }
+        ```
 
         **Required scope:** `webhook:write`
 
@@ -150,12 +182,27 @@ class RawWebhookClient:
             Event to subscribe to.
 
         filter : typing.Optional[WebhookSubscriptionFilter]
+            Optional event-specific filter. Which keys are valid depends on `event`
+            (see the schema). Omit to receive every occurrence; `{}` and `null` are
+            rejected rather than treated as "omitted". Example for DMs only:
+            `{"chatType": "dm"}`.
 
         api_version : typing.Optional[str]
             Optional [API version](https://developer.ro.am/docs/guides/api-versioning) (`YYYY-MM-DD`) to pin
             this subscription's payload shape to. When omitted, the subscription is
             frozen at your integration's default version. Unsupported values return
             `400`.
+
+        destination : typing.Optional[WebhookSubscriptionRequestDestination]
+            Optional delivery authentication. Omit for Standard Webhooks signed with
+            the API client's `whsec_`. Set `type` to `grok_bot` to deliver to a
+            [Grok Bot](https://developer.ro.am/docs/integrations/grok) webhook-routine URL: Roam signs with
+            the routine's sender key (`Authorization: Bearer` plus
+            `X-Grok-Signature`) or, if `token` is a `whsec_…` Standard Webhooks
+            secret, uses that secret instead of the API client's. The token is
+            write-only — subscribe and list responses echo `destination.type` only.
+            Re-subscribe without this field leaves existing destination auth
+            unchanged; send `"type": ""` to clear it.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -172,9 +219,12 @@ class RawWebhookClient:
                 "url": url,
                 "event": event,
                 "filter": convert_and_respect_annotation_metadata(
-                    object_=filter, annotation=typing.Optional[WebhookSubscriptionFilter], direction="write"
+                    object_=filter, annotation=WebhookSubscriptionFilter, direction="write"
                 ),
                 "apiVersion": api_version,
+                "destination": convert_and_respect_annotation_metadata(
+                    object_=destination, annotation=WebhookSubscriptionRequestDestination, direction="write"
+                ),
             },
             headers={
                 "content-type": "application/json",
@@ -576,6 +626,7 @@ class AsyncRawWebhookClient:
         event: WebhookSubscriptionRequestEvent,
         filter: typing.Optional[WebhookSubscriptionFilter] = OMIT,
         api_version: typing.Optional[str] = OMIT,
+        destination: typing.Optional[WebhookSubscriptionRequestDestination] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[Webhook]:
         """
@@ -592,7 +643,37 @@ class AsyncRawWebhookClient:
         Roam does not probe the destination URL when you subscribe — the
         subscription is created immediately and the first delivery is a real event.
 
-        See the [Webhooks overview](https://developer.ro.am/docs/webhooks/webhooks) for the full list of event names and their filters.
+        Optional `filter` limits which occurrences are delivered. Which keys are
+        valid depends on `event` — see that event's page and the
+        [Event Filters](https://developer.ro.am/docs/webhooks/webhooks#event-filters) table. Omit
+        `filter` to receive every occurrence. An empty object (`{}`) is rejected,
+        as is a filter that does not apply to the event.
+
+        **DMs only:**
+
+        ```json
+        {
+          "url": "https://example.com/hooks/messages",
+          "event": "chat.message",
+          "filter": { "chatType": "dm" }
+        }
+        ```
+
+        **Grok Bot routine** (no ngrok). `destination.token` is write-only — list
+        and subscribe responses echo `destination.type` only. See
+        [Grok](https://developer.ro.am/docs/integrations/grok).
+
+        ```json
+        {
+          "url": "https://api2.cursor.sh/automations/webhook/<id>",
+          "event": "chat.message",
+          "filter": { "self": true },
+          "destination": {
+            "type": "grok_bot",
+            "token": "<Grok routine sender key or whsec_…>"
+          }
+        }
+        ```
 
         **Required scope:** `webhook:write`
 
@@ -605,12 +686,27 @@ class AsyncRawWebhookClient:
             Event to subscribe to.
 
         filter : typing.Optional[WebhookSubscriptionFilter]
+            Optional event-specific filter. Which keys are valid depends on `event`
+            (see the schema). Omit to receive every occurrence; `{}` and `null` are
+            rejected rather than treated as "omitted". Example for DMs only:
+            `{"chatType": "dm"}`.
 
         api_version : typing.Optional[str]
             Optional [API version](https://developer.ro.am/docs/guides/api-versioning) (`YYYY-MM-DD`) to pin
             this subscription's payload shape to. When omitted, the subscription is
             frozen at your integration's default version. Unsupported values return
             `400`.
+
+        destination : typing.Optional[WebhookSubscriptionRequestDestination]
+            Optional delivery authentication. Omit for Standard Webhooks signed with
+            the API client's `whsec_`. Set `type` to `grok_bot` to deliver to a
+            [Grok Bot](https://developer.ro.am/docs/integrations/grok) webhook-routine URL: Roam signs with
+            the routine's sender key (`Authorization: Bearer` plus
+            `X-Grok-Signature`) or, if `token` is a `whsec_…` Standard Webhooks
+            secret, uses that secret instead of the API client's. The token is
+            write-only — subscribe and list responses echo `destination.type` only.
+            Re-subscribe without this field leaves existing destination auth
+            unchanged; send `"type": ""` to clear it.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -627,9 +723,12 @@ class AsyncRawWebhookClient:
                 "url": url,
                 "event": event,
                 "filter": convert_and_respect_annotation_metadata(
-                    object_=filter, annotation=typing.Optional[WebhookSubscriptionFilter], direction="write"
+                    object_=filter, annotation=WebhookSubscriptionFilter, direction="write"
                 ),
                 "apiVersion": api_version,
+                "destination": convert_and_respect_annotation_metadata(
+                    object_=destination, annotation=WebhookSubscriptionRequestDestination, direction="write"
+                ),
             },
             headers={
                 "content-type": "application/json",
