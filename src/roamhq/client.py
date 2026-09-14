@@ -16,6 +16,7 @@ if typing.TYPE_CHECKING:
     from .conversation.client import AsyncConversationClient, ConversationClient
     from .group.client import AsyncGroupClient, GroupClient
     from .groups.client import AsyncGroupsClient, GroupsClient
+    from .guest_badges.client import AsyncGuestBadgesClient, GuestBadgesClient
     from .item.client import AsyncItemClient, ItemClient
     from .lobby.client import AsyncLobbyClient, LobbyClient
     from .magicast.client import AsyncMagicastClient, MagicastClient
@@ -136,6 +137,7 @@ class RoamClient:
         self._magicasts: typing.Optional[MagicastsClient] = None
         self._group: typing.Optional[GroupClient] = None
         self._groups: typing.Optional[GroupsClient] = None
+        self._guest_badges: typing.Optional[GuestBadgesClient] = None
         self._token: typing.Optional[TokenClient] = None
         self._webhook: typing.Optional[WebhookClient] = None
 
@@ -274,6 +276,14 @@ class RoamClient:
 
             self._groups = GroupsClient(client_wrapper=self._client_wrapper)
         return self._groups
+
+    @property
+    def guest_badges(self):
+        if self._guest_badges is None:
+            from .guest_badges.client import GuestBadgesClient  # noqa: E402
+
+            self._guest_badges = GuestBadgesClient(client_wrapper=self._client_wrapper)
+        return self._guest_badges
 
     @property
     def token(self):
@@ -418,6 +428,7 @@ class AsyncRoamClient:
         self._magicasts: typing.Optional[AsyncMagicastsClient] = None
         self._group: typing.Optional[AsyncGroupClient] = None
         self._groups: typing.Optional[AsyncGroupsClient] = None
+        self._guest_badges: typing.Optional[AsyncGuestBadgesClient] = None
         self._token: typing.Optional[AsyncTokenClient] = None
         self._webhook: typing.Optional[AsyncWebhookClient] = None
 
@@ -556,6 +567,14 @@ class AsyncRoamClient:
 
             self._groups = AsyncGroupsClient(client_wrapper=self._client_wrapper)
         return self._groups
+
+    @property
+    def guest_badges(self):
+        if self._guest_badges is None:
+            from .guest_badges.client import AsyncGuestBadgesClient  # noqa: E402
+
+            self._guest_badges = AsyncGuestBadgesClient(client_wrapper=self._client_wrapper)
+        return self._guest_badges
 
     @property
     def token(self):
