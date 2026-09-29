@@ -17,8 +17,10 @@ class UserActivityDisplay(UniversalBaseModel):
 
     emoji: str = pydantic.Field()
     """
-    Badge shown on the user's seat. Required. At most 16 Unicode code
-    points, so ZWJ sequences (family emoji, flags) stay valid.
+    Badge shown on the user's seat. Required. Must be a single emoji —
+    a text blurb or several emoji is `invalid_parameter`. ZWJ sequences
+    (family, flags, keycaps, skin tones) count as one. At most 16
+    Unicode code points (the storage cap).
     """
 
     title: str = pydantic.Field()
