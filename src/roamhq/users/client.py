@@ -9,8 +9,11 @@ from ..core.client_wrapper import AsyncClientWrapper, SyncClientWrapper
 from ..core.request_options import RequestOptions
 from ..types.user_activity import UserActivity
 from ..types.user_activity_display import UserActivityDisplay
+from ..types.user_status_bubble_response import UserStatusBubbleResponse
 from .raw_client import AsyncRawUsersClient, RawUsersClient
 from .types.user_activity_list_response import UserActivityListResponse
+from .types.user_status_set_request_will_return import UserStatusSetRequestWillReturn
+from .types.user_status_set_response import UserStatusSetResponse
 
 # this is used as the default value for optional parameters
 OMIT = typing.cast(typing.Any, ...)
@@ -30,6 +33,287 @@ class UsersClient:
         RawUsersClient
         """
         return self._raw_client
+
+    def user_status_set(
+        self,
+        *,
+        user_id: str,
+        will_return: UserStatusSetRequestWillReturn,
+        status: typing.Optional[str] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> UserStatusSetResponse:
+        """
+        Record an absence on a workspace member — the same Will Return Today /
+        Out of Roam field the desktop client writes, already readable via
+        [`user.info?expand=status`](https://developer.ro.am/docs/api/user-info) and
+        [`user.status.update`](https://developer.ro.am/docs/webhooks/user-status-update).
+
+        This is **not** [external activity](https://developer.ro.am/docs/guides/user-activity). Use
+        `user.status.set` for HR absences (sick leave, vacation, parental leave,
+        public holidays). Use `user.activity.set` for a short-lived on-map glow
+        / emoji (phone call, browser meeting).
+
+        `willReturn` is last-writer-wins with the desktop client. Setting it
+        does **not** check the user out, does **not** enable Do Not Disturb, and
+        does **not** accept a `status` enum (`checkedIn` / `checkedOut` stay
+        read-only).
+
+        `outOfRoam` defaults to `true` (persistent Out of Roam, up to 2 years).
+        Pass `outOfRoam: false` for same-day Will Return Today (`returnTime`
+        must be less than 10 hours from now).
+
+        Identify the user with `userId`: a bare UUID, tagged `U-…` ID, or
+        ASCII email (same convention as `group.create` members). Third-party
+        systems that only have an email do not need a UUID lookup first.
+
+        See [Will Return / Out of Roam](https://developer.ro.am/docs/guides/user-status) for the two
+        modes, persistence across check-in, and an HRIS example.
+
+        **Access:** Organization and Personal. Organization tokens may target
+        any active member in the workspace. Personal tokens (OAuth or PAT) may
+        target only the token owner.
+
+        **Required scope:** `user:write.status`. Personal Access Tokens skip
+        this check; personal-mode OAuth installs must still request the scope.
+        Reading the field back via `user.info` still needs `user:read.status`.
+
+        Parameters
+        ----------
+        user_id : str
+            Target user. Bare UUID, tagged `U-…` ID, or ASCII email
+            (same convention as `group.create` members). Personal
+            tokens may only pass their own user. Does not require
+            `user:read.email` — email is an identifier, not a
+            disclosure.
+
+        will_return : UserStatusSetRequestWillReturn
+            Absence to write. Required. Replaces any existing Will
+            Return / Out of Roam on this user.
+
+        status : typing.Optional[str]
+            Rejected. Check-in status is read-only; absences go in
+            `willReturn`. Sending this field returns `400`
+            `invalid_arguments`.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        UserStatusSetResponse
+            Absence saved. `willReturn` echoes the written value (including
+            defaulted `outOfRoam`). `status` is the user's current check-in
+            (`checkedIn` / `checkedOut`) and is unchanged by this call. `userId`
+            is the canonical UUID.
+
+        Examples
+        --------
+        import datetime
+
+        from roamhq import RoamClient
+        from roamhq.users import UserStatusSetRequestWillReturn
+
+        client = RoamClient(
+            roam_version="YOUR_ROAM_VERSION",
+            token="YOUR_TOKEN",
+        )
+        client.users.user_status_set(
+            user_id="ada@example.com",
+            will_return=UserStatusSetRequestWillReturn(
+                return_time=datetime.datetime.fromisoformat(
+                    "2026-09-22 09:00:00+00:00",
+                ),
+                reason="On vacation",
+                out_of_roam=True,
+            ),
+        )
+        """
+        _response = self._raw_client.user_status_set(
+            user_id=user_id, will_return=will_return, status=status, request_options=request_options
+        )
+        return _response.data
+
+    def user_status_clear(self, *, user_id: str, request_options: typing.Optional[RequestOptions] = None) -> None:
+        """
+        Remove the Will Return / Out of Roam previously written with
+        [`user.status.set`](https://developer.ro.am/docs/api/user-status-set) or the desktop client.
+        Clears both same-day Will Return Today and persistent Out of Roam.
+
+        Clearing when nothing is set still returns **204**. This call does
+        **not** change check-in status.
+
+        See [Will Return / Out of Roam](https://developer.ro.am/docs/guides/user-status) for
+        persistence, check-in interaction, and the HRIS lifecycle.
+
+        **Access:** Organization and Personal. Organization tokens may target
+        any active member in the workspace. Personal tokens (OAuth or PAT) may
+        target only the token owner.
+
+        **Required scope:** `user:write.status`. Personal Access Tokens skip
+        this check; personal-mode OAuth installs must still request the scope.
+
+        Parameters
+        ----------
+        user_id : str
+            Target user. Bare UUID, tagged `U-…` ID, or ASCII email
+            (same convention as `group.create` members). Personal
+            tokens may only pass their own user.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        None
+
+        Examples
+        --------
+        from roamhq import RoamClient
+
+        client = RoamClient(
+            roam_version="YOUR_ROAM_VERSION",
+            token="YOUR_TOKEN",
+        )
+        client.users.user_status_clear(
+            user_id="ada@example.com",
+        )
+        """
+        _response = self._raw_client.user_status_clear(user_id=user_id, request_options=request_options)
+        return _response.data
+
+    def user_status_bubble_set(
+        self,
+        *,
+        user_id: str,
+        text: str,
+        ttl_seconds: typing.Optional[int] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> UserStatusBubbleResponse:
+        """
+        Replaces the shared UI/API thought bubble. Text is trimmed and limited to 1–20 Unicode code points. Omitted or null ttlSeconds defaults to 86400; integers from 300 through 86400 are accepted. Durations below 5 minutes or above 24 hours are rejected. Automatic map removal can take up to about a minute after expiration. Repeating set refreshes expiration. Sending expiresAt is rejected.
+
+        See [Status bubbles](https://developer.ro.am/docs/guides/user-status-bubble).
+
+        **Access:** Organization and Personal. Organization credentials may target an active user in the workspace. Personal OAuth and PATs may target only their owner. The workspace comes from the token.
+
+        **Required scope:** `user:write.statusBubble`. PATs skip the scope check; personal OAuth requires the scope.
+
+        Parameters
+        ----------
+        user_id : str
+            Bare UUID, tagged U-… ID, or ASCII email of the target user.
+
+        text : str
+            Text to trim and store. Must contain 1–20 Unicode code points after trimming. Blank text is rejected.
+
+        ttl_seconds : typing.Optional[int]
+            Optional duration. Omit or pass null for 24 hours. Durations outside 300–86400 seconds are rejected.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        UserStatusBubbleResponse
+            Current bubble and canonical user identifier.
+
+        Examples
+        --------
+        from roamhq import RoamClient
+
+        client = RoamClient(
+            roam_version="YOUR_ROAM_VERSION",
+            token="YOUR_TOKEN",
+        )
+        client.users.user_status_bubble_set(
+            user_id="ada@example.com",
+            text="At lunch 🍎",
+            ttl_seconds=3600,
+        )
+        """
+        _response = self._raw_client.user_status_bubble_set(
+            user_id=user_id, text=text, ttl_seconds=ttl_seconds, request_options=request_options
+        )
+        return _response.data
+
+    def user_status_bubble_get(
+        self, *, user_id: str, request_options: typing.Optional[RequestOptions] = None
+    ) -> UserStatusBubbleResponse:
+        """
+        Returns the shared UI/API thought bubble, or null when no live bubble exists. Expired bubbles are omitted before storage cleanup runs.
+
+        See [Status bubbles](https://developer.ro.am/docs/guides/user-status-bubble).
+
+        **Access:** Organization and Personal. Organization credentials may target an active user in the workspace. Personal OAuth and PATs may target only their owner. The workspace comes from the token.
+
+        **Required scope:** `user:read.statusBubble`. PATs skip the scope check; personal OAuth requires the scope.
+
+        Parameters
+        ----------
+        user_id : str
+            Bare UUID, tagged U-… ID, or ASCII email of the target user.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        UserStatusBubbleResponse
+            Current bubble and canonical user identifier.
+
+        Examples
+        --------
+        from roamhq import RoamClient
+
+        client = RoamClient(
+            roam_version="YOUR_ROAM_VERSION",
+            token="YOUR_TOKEN",
+        )
+        client.users.user_status_bubble_get(
+            user_id="userId",
+        )
+        """
+        _response = self._raw_client.user_status_bubble_get(user_id=user_id, request_options=request_options)
+        return _response.data
+
+    def user_status_bubble_clear(
+        self, *, user_id: str, request_options: typing.Optional[RequestOptions] = None
+    ) -> None:
+        """
+        Clears the shared thought bubble, including a bubble written by the UI or another integration. Repeating clear is a successful no-op. This does not clear Will Return or external activities.
+
+        See [Status bubbles](https://developer.ro.am/docs/guides/user-status-bubble).
+
+        **Access:** Organization and Personal. Organization credentials may target an active user in the workspace. Personal OAuth and PATs may target only their owner. The workspace comes from the token.
+
+        **Required scope:** `user:write.statusBubble`. PATs skip the scope check; personal OAuth requires the scope.
+
+        Parameters
+        ----------
+        user_id : str
+            Bare UUID, tagged U-… ID, or ASCII email of the target user.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        None
+
+        Examples
+        --------
+        from roamhq import RoamClient
+
+        client = RoamClient(
+            roam_version="YOUR_ROAM_VERSION",
+            token="YOUR_TOKEN",
+        )
+        client.users.user_status_bubble_clear(
+            user_id="ada@example.com",
+        )
+        """
+        _response = self._raw_client.user_status_bubble_clear(user_id=user_id, request_options=request_options)
+        return _response.data
 
     def user_activity_set(
         self,
@@ -62,6 +346,10 @@ class UsersClient:
         See [External activity](https://developer.ro.am/docs/guides/user-activity) for display, DND,
         TTL, stacking, and where the indicator appears on the map.
 
+        Identify the user with `userId`: a bare UUID, tagged `U-…` ID, or
+        ASCII email (same convention as `group.create` members). Third-party
+        systems that only have an email do not need a UUID lookup first.
+
         **Access:** Organization and Personal. Organization tokens may target
         any user in the workspace. Personal tokens (OAuth or PAT) may target
         only the token owner.
@@ -72,8 +360,11 @@ class UsersClient:
         Parameters
         ----------
         user_id : str
-            Target user. Bare or tagged UUID. Personal tokens may only
-            pass their own user.
+            Target user. Bare UUID, tagged `U-…` ID, or ASCII email
+            (same convention as `group.create` members). Personal
+            tokens may only pass their own user. Does not require
+            `user:read.email` — email is an identifier, not a
+            disclosure.
 
         external_id : str
             Caller-chosen session id, unique per integration and user.
@@ -124,7 +415,7 @@ class UsersClient:
             token="YOUR_TOKEN",
         )
         client.users.user_activity_set(
-            user_id="0cc74785-e31e-4403-aa5e-0cc7c1897e66",
+            user_id="ada@example.com",
             external_id="justcall:call:CA123",
             display=UserActivityDisplay(
                 emoji="📞",
@@ -173,8 +464,9 @@ class UsersClient:
         Parameters
         ----------
         user_id : str
-            Target user. Bare or tagged UUID. Personal tokens may only
-            pass their own user.
+            Target user. Bare UUID, tagged `U-…` ID, or ASCII email
+            (same convention as `group.create` members). Personal
+            tokens may only pass their own user.
 
         external_id : str
             The `externalId` previously passed to `user.activity.set`.
@@ -195,7 +487,7 @@ class UsersClient:
             token="YOUR_TOKEN",
         )
         client.users.user_activity_clear(
-            user_id="0cc74785-e31e-4403-aa5e-0cc7c1897e66",
+            user_id="ada@example.com",
             external_id="justcall:call:CA123",
         )
         """
@@ -230,8 +522,9 @@ class UsersClient:
         Parameters
         ----------
         user_id : str
-            Target user. Bare or tagged UUID. Personal tokens may only pass
-            their own user.
+            Target user. Bare UUID, tagged `U-…` ID, or ASCII email
+            (same convention as `group.create` members). Personal tokens
+            may only pass their own user.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -377,6 +670,326 @@ class AsyncUsersClient:
         """
         return self._raw_client
 
+    async def user_status_set(
+        self,
+        *,
+        user_id: str,
+        will_return: UserStatusSetRequestWillReturn,
+        status: typing.Optional[str] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> UserStatusSetResponse:
+        """
+        Record an absence on a workspace member — the same Will Return Today /
+        Out of Roam field the desktop client writes, already readable via
+        [`user.info?expand=status`](https://developer.ro.am/docs/api/user-info) and
+        [`user.status.update`](https://developer.ro.am/docs/webhooks/user-status-update).
+
+        This is **not** [external activity](https://developer.ro.am/docs/guides/user-activity). Use
+        `user.status.set` for HR absences (sick leave, vacation, parental leave,
+        public holidays). Use `user.activity.set` for a short-lived on-map glow
+        / emoji (phone call, browser meeting).
+
+        `willReturn` is last-writer-wins with the desktop client. Setting it
+        does **not** check the user out, does **not** enable Do Not Disturb, and
+        does **not** accept a `status` enum (`checkedIn` / `checkedOut` stay
+        read-only).
+
+        `outOfRoam` defaults to `true` (persistent Out of Roam, up to 2 years).
+        Pass `outOfRoam: false` for same-day Will Return Today (`returnTime`
+        must be less than 10 hours from now).
+
+        Identify the user with `userId`: a bare UUID, tagged `U-…` ID, or
+        ASCII email (same convention as `group.create` members). Third-party
+        systems that only have an email do not need a UUID lookup first.
+
+        See [Will Return / Out of Roam](https://developer.ro.am/docs/guides/user-status) for the two
+        modes, persistence across check-in, and an HRIS example.
+
+        **Access:** Organization and Personal. Organization tokens may target
+        any active member in the workspace. Personal tokens (OAuth or PAT) may
+        target only the token owner.
+
+        **Required scope:** `user:write.status`. Personal Access Tokens skip
+        this check; personal-mode OAuth installs must still request the scope.
+        Reading the field back via `user.info` still needs `user:read.status`.
+
+        Parameters
+        ----------
+        user_id : str
+            Target user. Bare UUID, tagged `U-…` ID, or ASCII email
+            (same convention as `group.create` members). Personal
+            tokens may only pass their own user. Does not require
+            `user:read.email` — email is an identifier, not a
+            disclosure.
+
+        will_return : UserStatusSetRequestWillReturn
+            Absence to write. Required. Replaces any existing Will
+            Return / Out of Roam on this user.
+
+        status : typing.Optional[str]
+            Rejected. Check-in status is read-only; absences go in
+            `willReturn`. Sending this field returns `400`
+            `invalid_arguments`.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        UserStatusSetResponse
+            Absence saved. `willReturn` echoes the written value (including
+            defaulted `outOfRoam`). `status` is the user's current check-in
+            (`checkedIn` / `checkedOut`) and is unchanged by this call. `userId`
+            is the canonical UUID.
+
+        Examples
+        --------
+        import asyncio
+        import datetime
+
+        from roamhq import AsyncRoamClient
+        from roamhq.users import UserStatusSetRequestWillReturn
+
+        client = AsyncRoamClient(
+            roam_version="YOUR_ROAM_VERSION",
+            token="YOUR_TOKEN",
+        )
+
+
+        async def main() -> None:
+            await client.users.user_status_set(
+                user_id="ada@example.com",
+                will_return=UserStatusSetRequestWillReturn(
+                    return_time=datetime.datetime.fromisoformat(
+                        "2026-09-22 09:00:00+00:00",
+                    ),
+                    reason="On vacation",
+                    out_of_roam=True,
+                ),
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.user_status_set(
+            user_id=user_id, will_return=will_return, status=status, request_options=request_options
+        )
+        return _response.data
+
+    async def user_status_clear(self, *, user_id: str, request_options: typing.Optional[RequestOptions] = None) -> None:
+        """
+        Remove the Will Return / Out of Roam previously written with
+        [`user.status.set`](https://developer.ro.am/docs/api/user-status-set) or the desktop client.
+        Clears both same-day Will Return Today and persistent Out of Roam.
+
+        Clearing when nothing is set still returns **204**. This call does
+        **not** change check-in status.
+
+        See [Will Return / Out of Roam](https://developer.ro.am/docs/guides/user-status) for
+        persistence, check-in interaction, and the HRIS lifecycle.
+
+        **Access:** Organization and Personal. Organization tokens may target
+        any active member in the workspace. Personal tokens (OAuth or PAT) may
+        target only the token owner.
+
+        **Required scope:** `user:write.status`. Personal Access Tokens skip
+        this check; personal-mode OAuth installs must still request the scope.
+
+        Parameters
+        ----------
+        user_id : str
+            Target user. Bare UUID, tagged `U-…` ID, or ASCII email
+            (same convention as `group.create` members). Personal
+            tokens may only pass their own user.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        None
+
+        Examples
+        --------
+        import asyncio
+
+        from roamhq import AsyncRoamClient
+
+        client = AsyncRoamClient(
+            roam_version="YOUR_ROAM_VERSION",
+            token="YOUR_TOKEN",
+        )
+
+
+        async def main() -> None:
+            await client.users.user_status_clear(
+                user_id="ada@example.com",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.user_status_clear(user_id=user_id, request_options=request_options)
+        return _response.data
+
+    async def user_status_bubble_set(
+        self,
+        *,
+        user_id: str,
+        text: str,
+        ttl_seconds: typing.Optional[int] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> UserStatusBubbleResponse:
+        """
+        Replaces the shared UI/API thought bubble. Text is trimmed and limited to 1–20 Unicode code points. Omitted or null ttlSeconds defaults to 86400; integers from 300 through 86400 are accepted. Durations below 5 minutes or above 24 hours are rejected. Automatic map removal can take up to about a minute after expiration. Repeating set refreshes expiration. Sending expiresAt is rejected.
+
+        See [Status bubbles](https://developer.ro.am/docs/guides/user-status-bubble).
+
+        **Access:** Organization and Personal. Organization credentials may target an active user in the workspace. Personal OAuth and PATs may target only their owner. The workspace comes from the token.
+
+        **Required scope:** `user:write.statusBubble`. PATs skip the scope check; personal OAuth requires the scope.
+
+        Parameters
+        ----------
+        user_id : str
+            Bare UUID, tagged U-… ID, or ASCII email of the target user.
+
+        text : str
+            Text to trim and store. Must contain 1–20 Unicode code points after trimming. Blank text is rejected.
+
+        ttl_seconds : typing.Optional[int]
+            Optional duration. Omit or pass null for 24 hours. Durations outside 300–86400 seconds are rejected.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        UserStatusBubbleResponse
+            Current bubble and canonical user identifier.
+
+        Examples
+        --------
+        import asyncio
+
+        from roamhq import AsyncRoamClient
+
+        client = AsyncRoamClient(
+            roam_version="YOUR_ROAM_VERSION",
+            token="YOUR_TOKEN",
+        )
+
+
+        async def main() -> None:
+            await client.users.user_status_bubble_set(
+                user_id="ada@example.com",
+                text="At lunch 🍎",
+                ttl_seconds=3600,
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.user_status_bubble_set(
+            user_id=user_id, text=text, ttl_seconds=ttl_seconds, request_options=request_options
+        )
+        return _response.data
+
+    async def user_status_bubble_get(
+        self, *, user_id: str, request_options: typing.Optional[RequestOptions] = None
+    ) -> UserStatusBubbleResponse:
+        """
+        Returns the shared UI/API thought bubble, or null when no live bubble exists. Expired bubbles are omitted before storage cleanup runs.
+
+        See [Status bubbles](https://developer.ro.am/docs/guides/user-status-bubble).
+
+        **Access:** Organization and Personal. Organization credentials may target an active user in the workspace. Personal OAuth and PATs may target only their owner. The workspace comes from the token.
+
+        **Required scope:** `user:read.statusBubble`. PATs skip the scope check; personal OAuth requires the scope.
+
+        Parameters
+        ----------
+        user_id : str
+            Bare UUID, tagged U-… ID, or ASCII email of the target user.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        UserStatusBubbleResponse
+            Current bubble and canonical user identifier.
+
+        Examples
+        --------
+        import asyncio
+
+        from roamhq import AsyncRoamClient
+
+        client = AsyncRoamClient(
+            roam_version="YOUR_ROAM_VERSION",
+            token="YOUR_TOKEN",
+        )
+
+
+        async def main() -> None:
+            await client.users.user_status_bubble_get(
+                user_id="userId",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.user_status_bubble_get(user_id=user_id, request_options=request_options)
+        return _response.data
+
+    async def user_status_bubble_clear(
+        self, *, user_id: str, request_options: typing.Optional[RequestOptions] = None
+    ) -> None:
+        """
+        Clears the shared thought bubble, including a bubble written by the UI or another integration. Repeating clear is a successful no-op. This does not clear Will Return or external activities.
+
+        See [Status bubbles](https://developer.ro.am/docs/guides/user-status-bubble).
+
+        **Access:** Organization and Personal. Organization credentials may target an active user in the workspace. Personal OAuth and PATs may target only their owner. The workspace comes from the token.
+
+        **Required scope:** `user:write.statusBubble`. PATs skip the scope check; personal OAuth requires the scope.
+
+        Parameters
+        ----------
+        user_id : str
+            Bare UUID, tagged U-… ID, or ASCII email of the target user.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        None
+
+        Examples
+        --------
+        import asyncio
+
+        from roamhq import AsyncRoamClient
+
+        client = AsyncRoamClient(
+            roam_version="YOUR_ROAM_VERSION",
+            token="YOUR_TOKEN",
+        )
+
+
+        async def main() -> None:
+            await client.users.user_status_bubble_clear(
+                user_id="ada@example.com",
+            )
+
+
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.user_status_bubble_clear(user_id=user_id, request_options=request_options)
+        return _response.data
+
     async def user_activity_set(
         self,
         *,
@@ -408,6 +1021,10 @@ class AsyncUsersClient:
         See [External activity](https://developer.ro.am/docs/guides/user-activity) for display, DND,
         TTL, stacking, and where the indicator appears on the map.
 
+        Identify the user with `userId`: a bare UUID, tagged `U-…` ID, or
+        ASCII email (same convention as `group.create` members). Third-party
+        systems that only have an email do not need a UUID lookup first.
+
         **Access:** Organization and Personal. Organization tokens may target
         any user in the workspace. Personal tokens (OAuth or PAT) may target
         only the token owner.
@@ -418,8 +1035,11 @@ class AsyncUsersClient:
         Parameters
         ----------
         user_id : str
-            Target user. Bare or tagged UUID. Personal tokens may only
-            pass their own user.
+            Target user. Bare UUID, tagged `U-…` ID, or ASCII email
+            (same convention as `group.create` members). Personal
+            tokens may only pass their own user. Does not require
+            `user:read.email` — email is an identifier, not a
+            disclosure.
 
         external_id : str
             Caller-chosen session id, unique per integration and user.
@@ -475,7 +1095,7 @@ class AsyncUsersClient:
 
         async def main() -> None:
             await client.users.user_activity_set(
-                user_id="0cc74785-e31e-4403-aa5e-0cc7c1897e66",
+                user_id="ada@example.com",
                 external_id="justcall:call:CA123",
                 display=UserActivityDisplay(
                     emoji="📞",
@@ -527,8 +1147,9 @@ class AsyncUsersClient:
         Parameters
         ----------
         user_id : str
-            Target user. Bare or tagged UUID. Personal tokens may only
-            pass their own user.
+            Target user. Bare UUID, tagged `U-…` ID, or ASCII email
+            (same convention as `group.create` members). Personal
+            tokens may only pass their own user.
 
         external_id : str
             The `externalId` previously passed to `user.activity.set`.
@@ -554,7 +1175,7 @@ class AsyncUsersClient:
 
         async def main() -> None:
             await client.users.user_activity_clear(
-                user_id="0cc74785-e31e-4403-aa5e-0cc7c1897e66",
+                user_id="ada@example.com",
                 external_id="justcall:call:CA123",
             )
 
@@ -592,8 +1213,9 @@ class AsyncUsersClient:
         Parameters
         ----------
         user_id : str
-            Target user. Bare or tagged UUID. Personal tokens may only pass
-            their own user.
+            Target user. Bare UUID, tagged `U-…` ID, or ASCII email
+            (same convention as `group.create` members). Personal tokens
+            may only pass their own user.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.

@@ -23,7 +23,10 @@ from ..errors.unauthorized_error import UnauthorizedError
 from ..types.error import Error
 from ..types.user_activity import UserActivity
 from ..types.user_activity_display import UserActivityDisplay
+from ..types.user_status_bubble_response import UserStatusBubbleResponse
 from .types.user_activity_list_response import UserActivityListResponse
+from .types.user_status_set_request_will_return import UserStatusSetRequestWillReturn
+from .types.user_status_set_response import UserStatusSetResponse
 from pydantic import ValidationError
 
 # this is used as the default value for optional parameters
@@ -33,6 +36,726 @@ OMIT = typing.cast(typing.Any, ...)
 class RawUsersClient:
     def __init__(self, *, client_wrapper: SyncClientWrapper):
         self._client_wrapper = client_wrapper
+
+    def user_status_set(
+        self,
+        *,
+        user_id: str,
+        will_return: UserStatusSetRequestWillReturn,
+        status: typing.Optional[str] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> HttpResponse[UserStatusSetResponse]:
+        """
+        Record an absence on a workspace member — the same Will Return Today /
+        Out of Roam field the desktop client writes, already readable via
+        [`user.info?expand=status`](https://developer.ro.am/docs/api/user-info) and
+        [`user.status.update`](https://developer.ro.am/docs/webhooks/user-status-update).
+
+        This is **not** [external activity](https://developer.ro.am/docs/guides/user-activity). Use
+        `user.status.set` for HR absences (sick leave, vacation, parental leave,
+        public holidays). Use `user.activity.set` for a short-lived on-map glow
+        / emoji (phone call, browser meeting).
+
+        `willReturn` is last-writer-wins with the desktop client. Setting it
+        does **not** check the user out, does **not** enable Do Not Disturb, and
+        does **not** accept a `status` enum (`checkedIn` / `checkedOut` stay
+        read-only).
+
+        `outOfRoam` defaults to `true` (persistent Out of Roam, up to 2 years).
+        Pass `outOfRoam: false` for same-day Will Return Today (`returnTime`
+        must be less than 10 hours from now).
+
+        Identify the user with `userId`: a bare UUID, tagged `U-…` ID, or
+        ASCII email (same convention as `group.create` members). Third-party
+        systems that only have an email do not need a UUID lookup first.
+
+        See [Will Return / Out of Roam](https://developer.ro.am/docs/guides/user-status) for the two
+        modes, persistence across check-in, and an HRIS example.
+
+        **Access:** Organization and Personal. Organization tokens may target
+        any active member in the workspace. Personal tokens (OAuth or PAT) may
+        target only the token owner.
+
+        **Required scope:** `user:write.status`. Personal Access Tokens skip
+        this check; personal-mode OAuth installs must still request the scope.
+        Reading the field back via `user.info` still needs `user:read.status`.
+
+        Parameters
+        ----------
+        user_id : str
+            Target user. Bare UUID, tagged `U-…` ID, or ASCII email
+            (same convention as `group.create` members). Personal
+            tokens may only pass their own user. Does not require
+            `user:read.email` — email is an identifier, not a
+            disclosure.
+
+        will_return : UserStatusSetRequestWillReturn
+            Absence to write. Required. Replaces any existing Will
+            Return / Out of Roam on this user.
+
+        status : typing.Optional[str]
+            Rejected. Check-in status is read-only; absences go in
+            `willReturn`. Sending this field returns `400`
+            `invalid_arguments`.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[UserStatusSetResponse]
+            Absence saved. `willReturn` echoes the written value (including
+            defaulted `outOfRoam`). `status` is the user's current check-in
+            (`checkedIn` / `checkedOut`) and is unchanged by this call. `userId`
+            is the canonical UUID.
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            "user.status.set",
+            method="POST",
+            json={
+                "userId": user_id,
+                "willReturn": convert_and_respect_annotation_metadata(
+                    object_=will_return, annotation=UserStatusSetRequestWillReturn, direction="write"
+                ),
+                "status": status,
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    UserStatusSetResponse,
+                    parse_obj_as(
+                        type_=UserStatusSetResponse,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 400:
+                raise BadRequestError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 401:
+                raise UnauthorizedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 403:
+                raise ForbiddenError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 404:
+                raise NotFoundError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 405:
+                raise MethodNotAllowedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 429:
+                raise TooManyRequestsError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 500:
+                raise InternalServerError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def user_status_clear(
+        self, *, user_id: str, request_options: typing.Optional[RequestOptions] = None
+    ) -> HttpResponse[None]:
+        """
+        Remove the Will Return / Out of Roam previously written with
+        [`user.status.set`](https://developer.ro.am/docs/api/user-status-set) or the desktop client.
+        Clears both same-day Will Return Today and persistent Out of Roam.
+
+        Clearing when nothing is set still returns **204**. This call does
+        **not** change check-in status.
+
+        See [Will Return / Out of Roam](https://developer.ro.am/docs/guides/user-status) for
+        persistence, check-in interaction, and the HRIS lifecycle.
+
+        **Access:** Organization and Personal. Organization tokens may target
+        any active member in the workspace. Personal tokens (OAuth or PAT) may
+        target only the token owner.
+
+        **Required scope:** `user:write.status`. Personal Access Tokens skip
+        this check; personal-mode OAuth installs must still request the scope.
+
+        Parameters
+        ----------
+        user_id : str
+            Target user. Bare UUID, tagged `U-…` ID, or ASCII email
+            (same convention as `group.create` members). Personal
+            tokens may only pass their own user.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[None]
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            "user.status.clear",
+            method="POST",
+            json={
+                "userId": user_id,
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                return HttpResponse(response=_response, data=None)
+            if _response.status_code == 400:
+                raise BadRequestError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 401:
+                raise UnauthorizedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 403:
+                raise ForbiddenError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 404:
+                raise NotFoundError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 405:
+                raise MethodNotAllowedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 429:
+                raise TooManyRequestsError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 500:
+                raise InternalServerError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def user_status_bubble_set(
+        self,
+        *,
+        user_id: str,
+        text: str,
+        ttl_seconds: typing.Optional[int] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> HttpResponse[UserStatusBubbleResponse]:
+        """
+        Replaces the shared UI/API thought bubble. Text is trimmed and limited to 1–20 Unicode code points. Omitted or null ttlSeconds defaults to 86400; integers from 300 through 86400 are accepted. Durations below 5 minutes or above 24 hours are rejected. Automatic map removal can take up to about a minute after expiration. Repeating set refreshes expiration. Sending expiresAt is rejected.
+
+        See [Status bubbles](https://developer.ro.am/docs/guides/user-status-bubble).
+
+        **Access:** Organization and Personal. Organization credentials may target an active user in the workspace. Personal OAuth and PATs may target only their owner. The workspace comes from the token.
+
+        **Required scope:** `user:write.statusBubble`. PATs skip the scope check; personal OAuth requires the scope.
+
+        Parameters
+        ----------
+        user_id : str
+            Bare UUID, tagged U-… ID, or ASCII email of the target user.
+
+        text : str
+            Text to trim and store. Must contain 1–20 Unicode code points after trimming. Blank text is rejected.
+
+        ttl_seconds : typing.Optional[int]
+            Optional duration. Omit or pass null for 24 hours. Durations outside 300–86400 seconds are rejected.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[UserStatusBubbleResponse]
+            Current bubble and canonical user identifier.
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            "user.statusBubble.set",
+            method="POST",
+            json={
+                "userId": user_id,
+                "text": text,
+                "ttlSeconds": ttl_seconds,
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    UserStatusBubbleResponse,
+                    parse_obj_as(
+                        type_=UserStatusBubbleResponse,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 400:
+                raise BadRequestError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 401:
+                raise UnauthorizedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 403:
+                raise ForbiddenError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 404:
+                raise NotFoundError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 405:
+                raise MethodNotAllowedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 429:
+                raise TooManyRequestsError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 500:
+                raise InternalServerError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def user_status_bubble_get(
+        self, *, user_id: str, request_options: typing.Optional[RequestOptions] = None
+    ) -> HttpResponse[UserStatusBubbleResponse]:
+        """
+        Returns the shared UI/API thought bubble, or null when no live bubble exists. Expired bubbles are omitted before storage cleanup runs.
+
+        See [Status bubbles](https://developer.ro.am/docs/guides/user-status-bubble).
+
+        **Access:** Organization and Personal. Organization credentials may target an active user in the workspace. Personal OAuth and PATs may target only their owner. The workspace comes from the token.
+
+        **Required scope:** `user:read.statusBubble`. PATs skip the scope check; personal OAuth requires the scope.
+
+        Parameters
+        ----------
+        user_id : str
+            Bare UUID, tagged U-… ID, or ASCII email of the target user.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[UserStatusBubbleResponse]
+            Current bubble and canonical user identifier.
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            "user.statusBubble.get",
+            method="GET",
+            params={
+                "userId": user_id,
+            },
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    UserStatusBubbleResponse,
+                    parse_obj_as(
+                        type_=UserStatusBubbleResponse,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 400:
+                raise BadRequestError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 401:
+                raise UnauthorizedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 403:
+                raise ForbiddenError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 404:
+                raise NotFoundError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 405:
+                raise MethodNotAllowedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 429:
+                raise TooManyRequestsError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 500:
+                raise InternalServerError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def user_status_bubble_clear(
+        self, *, user_id: str, request_options: typing.Optional[RequestOptions] = None
+    ) -> HttpResponse[None]:
+        """
+        Clears the shared thought bubble, including a bubble written by the UI or another integration. Repeating clear is a successful no-op. This does not clear Will Return or external activities.
+
+        See [Status bubbles](https://developer.ro.am/docs/guides/user-status-bubble).
+
+        **Access:** Organization and Personal. Organization credentials may target an active user in the workspace. Personal OAuth and PATs may target only their owner. The workspace comes from the token.
+
+        **Required scope:** `user:write.statusBubble`. PATs skip the scope check; personal OAuth requires the scope.
+
+        Parameters
+        ----------
+        user_id : str
+            Bare UUID, tagged U-… ID, or ASCII email of the target user.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[None]
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            "user.statusBubble.clear",
+            method="POST",
+            json={
+                "userId": user_id,
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                return HttpResponse(response=_response, data=None)
+            if _response.status_code == 400:
+                raise BadRequestError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 401:
+                raise UnauthorizedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 403:
+                raise ForbiddenError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 404:
+                raise NotFoundError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 405:
+                raise MethodNotAllowedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 429:
+                raise TooManyRequestsError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 500:
+                raise InternalServerError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
     def user_activity_set(
         self,
@@ -65,6 +788,10 @@ class RawUsersClient:
         See [External activity](https://developer.ro.am/docs/guides/user-activity) for display, DND,
         TTL, stacking, and where the indicator appears on the map.
 
+        Identify the user with `userId`: a bare UUID, tagged `U-…` ID, or
+        ASCII email (same convention as `group.create` members). Third-party
+        systems that only have an email do not need a UUID lookup first.
+
         **Access:** Organization and Personal. Organization tokens may target
         any user in the workspace. Personal tokens (OAuth or PAT) may target
         only the token owner.
@@ -75,8 +802,11 @@ class RawUsersClient:
         Parameters
         ----------
         user_id : str
-            Target user. Bare or tagged UUID. Personal tokens may only
-            pass their own user.
+            Target user. Bare UUID, tagged `U-…` ID, or ASCII email
+            (same convention as `group.create` members). Personal
+            tokens may only pass their own user. Does not require
+            `user:read.email` — email is an identifier, not a
+            disclosure.
 
         external_id : str
             Caller-chosen session id, unique per integration and user.
@@ -259,8 +989,9 @@ class RawUsersClient:
         Parameters
         ----------
         user_id : str
-            Target user. Bare or tagged UUID. Personal tokens may only
-            pass their own user.
+            Target user. Bare UUID, tagged `U-…` ID, or ASCII email
+            (same convention as `group.create` members). Personal
+            tokens may only pass their own user.
 
         external_id : str
             The `externalId` previously passed to `user.activity.set`.
@@ -400,8 +1131,9 @@ class RawUsersClient:
         Parameters
         ----------
         user_id : str
-            Target user. Bare or tagged UUID. Personal tokens may only pass
-            their own user.
+            Target user. Bare UUID, tagged `U-…` ID, or ASCII email
+            (same convention as `group.create` members). Personal tokens
+            may only pass their own user.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -698,6 +1430,726 @@ class AsyncRawUsersClient:
     def __init__(self, *, client_wrapper: AsyncClientWrapper):
         self._client_wrapper = client_wrapper
 
+    async def user_status_set(
+        self,
+        *,
+        user_id: str,
+        will_return: UserStatusSetRequestWillReturn,
+        status: typing.Optional[str] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> AsyncHttpResponse[UserStatusSetResponse]:
+        """
+        Record an absence on a workspace member — the same Will Return Today /
+        Out of Roam field the desktop client writes, already readable via
+        [`user.info?expand=status`](https://developer.ro.am/docs/api/user-info) and
+        [`user.status.update`](https://developer.ro.am/docs/webhooks/user-status-update).
+
+        This is **not** [external activity](https://developer.ro.am/docs/guides/user-activity). Use
+        `user.status.set` for HR absences (sick leave, vacation, parental leave,
+        public holidays). Use `user.activity.set` for a short-lived on-map glow
+        / emoji (phone call, browser meeting).
+
+        `willReturn` is last-writer-wins with the desktop client. Setting it
+        does **not** check the user out, does **not** enable Do Not Disturb, and
+        does **not** accept a `status` enum (`checkedIn` / `checkedOut` stay
+        read-only).
+
+        `outOfRoam` defaults to `true` (persistent Out of Roam, up to 2 years).
+        Pass `outOfRoam: false` for same-day Will Return Today (`returnTime`
+        must be less than 10 hours from now).
+
+        Identify the user with `userId`: a bare UUID, tagged `U-…` ID, or
+        ASCII email (same convention as `group.create` members). Third-party
+        systems that only have an email do not need a UUID lookup first.
+
+        See [Will Return / Out of Roam](https://developer.ro.am/docs/guides/user-status) for the two
+        modes, persistence across check-in, and an HRIS example.
+
+        **Access:** Organization and Personal. Organization tokens may target
+        any active member in the workspace. Personal tokens (OAuth or PAT) may
+        target only the token owner.
+
+        **Required scope:** `user:write.status`. Personal Access Tokens skip
+        this check; personal-mode OAuth installs must still request the scope.
+        Reading the field back via `user.info` still needs `user:read.status`.
+
+        Parameters
+        ----------
+        user_id : str
+            Target user. Bare UUID, tagged `U-…` ID, or ASCII email
+            (same convention as `group.create` members). Personal
+            tokens may only pass their own user. Does not require
+            `user:read.email` — email is an identifier, not a
+            disclosure.
+
+        will_return : UserStatusSetRequestWillReturn
+            Absence to write. Required. Replaces any existing Will
+            Return / Out of Roam on this user.
+
+        status : typing.Optional[str]
+            Rejected. Check-in status is read-only; absences go in
+            `willReturn`. Sending this field returns `400`
+            `invalid_arguments`.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[UserStatusSetResponse]
+            Absence saved. `willReturn` echoes the written value (including
+            defaulted `outOfRoam`). `status` is the user's current check-in
+            (`checkedIn` / `checkedOut`) and is unchanged by this call. `userId`
+            is the canonical UUID.
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            "user.status.set",
+            method="POST",
+            json={
+                "userId": user_id,
+                "willReturn": convert_and_respect_annotation_metadata(
+                    object_=will_return, annotation=UserStatusSetRequestWillReturn, direction="write"
+                ),
+                "status": status,
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    UserStatusSetResponse,
+                    parse_obj_as(
+                        type_=UserStatusSetResponse,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 400:
+                raise BadRequestError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 401:
+                raise UnauthorizedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 403:
+                raise ForbiddenError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 404:
+                raise NotFoundError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 405:
+                raise MethodNotAllowedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 429:
+                raise TooManyRequestsError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 500:
+                raise InternalServerError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def user_status_clear(
+        self, *, user_id: str, request_options: typing.Optional[RequestOptions] = None
+    ) -> AsyncHttpResponse[None]:
+        """
+        Remove the Will Return / Out of Roam previously written with
+        [`user.status.set`](https://developer.ro.am/docs/api/user-status-set) or the desktop client.
+        Clears both same-day Will Return Today and persistent Out of Roam.
+
+        Clearing when nothing is set still returns **204**. This call does
+        **not** change check-in status.
+
+        See [Will Return / Out of Roam](https://developer.ro.am/docs/guides/user-status) for
+        persistence, check-in interaction, and the HRIS lifecycle.
+
+        **Access:** Organization and Personal. Organization tokens may target
+        any active member in the workspace. Personal tokens (OAuth or PAT) may
+        target only the token owner.
+
+        **Required scope:** `user:write.status`. Personal Access Tokens skip
+        this check; personal-mode OAuth installs must still request the scope.
+
+        Parameters
+        ----------
+        user_id : str
+            Target user. Bare UUID, tagged `U-…` ID, or ASCII email
+            (same convention as `group.create` members). Personal
+            tokens may only pass their own user.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[None]
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            "user.status.clear",
+            method="POST",
+            json={
+                "userId": user_id,
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                return AsyncHttpResponse(response=_response, data=None)
+            if _response.status_code == 400:
+                raise BadRequestError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 401:
+                raise UnauthorizedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 403:
+                raise ForbiddenError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 404:
+                raise NotFoundError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 405:
+                raise MethodNotAllowedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 429:
+                raise TooManyRequestsError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 500:
+                raise InternalServerError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def user_status_bubble_set(
+        self,
+        *,
+        user_id: str,
+        text: str,
+        ttl_seconds: typing.Optional[int] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> AsyncHttpResponse[UserStatusBubbleResponse]:
+        """
+        Replaces the shared UI/API thought bubble. Text is trimmed and limited to 1–20 Unicode code points. Omitted or null ttlSeconds defaults to 86400; integers from 300 through 86400 are accepted. Durations below 5 minutes or above 24 hours are rejected. Automatic map removal can take up to about a minute after expiration. Repeating set refreshes expiration. Sending expiresAt is rejected.
+
+        See [Status bubbles](https://developer.ro.am/docs/guides/user-status-bubble).
+
+        **Access:** Organization and Personal. Organization credentials may target an active user in the workspace. Personal OAuth and PATs may target only their owner. The workspace comes from the token.
+
+        **Required scope:** `user:write.statusBubble`. PATs skip the scope check; personal OAuth requires the scope.
+
+        Parameters
+        ----------
+        user_id : str
+            Bare UUID, tagged U-… ID, or ASCII email of the target user.
+
+        text : str
+            Text to trim and store. Must contain 1–20 Unicode code points after trimming. Blank text is rejected.
+
+        ttl_seconds : typing.Optional[int]
+            Optional duration. Omit or pass null for 24 hours. Durations outside 300–86400 seconds are rejected.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[UserStatusBubbleResponse]
+            Current bubble and canonical user identifier.
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            "user.statusBubble.set",
+            method="POST",
+            json={
+                "userId": user_id,
+                "text": text,
+                "ttlSeconds": ttl_seconds,
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    UserStatusBubbleResponse,
+                    parse_obj_as(
+                        type_=UserStatusBubbleResponse,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 400:
+                raise BadRequestError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 401:
+                raise UnauthorizedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 403:
+                raise ForbiddenError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 404:
+                raise NotFoundError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 405:
+                raise MethodNotAllowedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 429:
+                raise TooManyRequestsError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 500:
+                raise InternalServerError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def user_status_bubble_get(
+        self, *, user_id: str, request_options: typing.Optional[RequestOptions] = None
+    ) -> AsyncHttpResponse[UserStatusBubbleResponse]:
+        """
+        Returns the shared UI/API thought bubble, or null when no live bubble exists. Expired bubbles are omitted before storage cleanup runs.
+
+        See [Status bubbles](https://developer.ro.am/docs/guides/user-status-bubble).
+
+        **Access:** Organization and Personal. Organization credentials may target an active user in the workspace. Personal OAuth and PATs may target only their owner. The workspace comes from the token.
+
+        **Required scope:** `user:read.statusBubble`. PATs skip the scope check; personal OAuth requires the scope.
+
+        Parameters
+        ----------
+        user_id : str
+            Bare UUID, tagged U-… ID, or ASCII email of the target user.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[UserStatusBubbleResponse]
+            Current bubble and canonical user identifier.
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            "user.statusBubble.get",
+            method="GET",
+            params={
+                "userId": user_id,
+            },
+            request_options=request_options,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    UserStatusBubbleResponse,
+                    parse_obj_as(
+                        type_=UserStatusBubbleResponse,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 400:
+                raise BadRequestError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 401:
+                raise UnauthorizedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 403:
+                raise ForbiddenError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 404:
+                raise NotFoundError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 405:
+                raise MethodNotAllowedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 429:
+                raise TooManyRequestsError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 500:
+                raise InternalServerError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def user_status_bubble_clear(
+        self, *, user_id: str, request_options: typing.Optional[RequestOptions] = None
+    ) -> AsyncHttpResponse[None]:
+        """
+        Clears the shared thought bubble, including a bubble written by the UI or another integration. Repeating clear is a successful no-op. This does not clear Will Return or external activities.
+
+        See [Status bubbles](https://developer.ro.am/docs/guides/user-status-bubble).
+
+        **Access:** Organization and Personal. Organization credentials may target an active user in the workspace. Personal OAuth and PATs may target only their owner. The workspace comes from the token.
+
+        **Required scope:** `user:write.statusBubble`. PATs skip the scope check; personal OAuth requires the scope.
+
+        Parameters
+        ----------
+        user_id : str
+            Bare UUID, tagged U-… ID, or ASCII email of the target user.
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[None]
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            "user.statusBubble.clear",
+            method="POST",
+            json={
+                "userId": user_id,
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                return AsyncHttpResponse(response=_response, data=None)
+            if _response.status_code == 400:
+                raise BadRequestError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 401:
+                raise UnauthorizedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 403:
+                raise ForbiddenError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 404:
+                raise NotFoundError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 405:
+                raise MethodNotAllowedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 429:
+                raise TooManyRequestsError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        Error,
+                        parse_obj_as(
+                            type_=Error,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 500:
+                raise InternalServerError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Any,
+                        parse_obj_as(
+                            type_=typing.Any,  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        except ValidationError as e:
+            raise ParsingError(
+                status_code=_response.status_code, headers=dict(_response.headers), body=_response.json(), cause=e
+            )
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
     async def user_activity_set(
         self,
         *,
@@ -729,6 +2181,10 @@ class AsyncRawUsersClient:
         See [External activity](https://developer.ro.am/docs/guides/user-activity) for display, DND,
         TTL, stacking, and where the indicator appears on the map.
 
+        Identify the user with `userId`: a bare UUID, tagged `U-…` ID, or
+        ASCII email (same convention as `group.create` members). Third-party
+        systems that only have an email do not need a UUID lookup first.
+
         **Access:** Organization and Personal. Organization tokens may target
         any user in the workspace. Personal tokens (OAuth or PAT) may target
         only the token owner.
@@ -739,8 +2195,11 @@ class AsyncRawUsersClient:
         Parameters
         ----------
         user_id : str
-            Target user. Bare or tagged UUID. Personal tokens may only
-            pass their own user.
+            Target user. Bare UUID, tagged `U-…` ID, or ASCII email
+            (same convention as `group.create` members). Personal
+            tokens may only pass their own user. Does not require
+            `user:read.email` — email is an identifier, not a
+            disclosure.
 
         external_id : str
             Caller-chosen session id, unique per integration and user.
@@ -923,8 +2382,9 @@ class AsyncRawUsersClient:
         Parameters
         ----------
         user_id : str
-            Target user. Bare or tagged UUID. Personal tokens may only
-            pass their own user.
+            Target user. Bare UUID, tagged `U-…` ID, or ASCII email
+            (same convention as `group.create` members). Personal
+            tokens may only pass their own user.
 
         external_id : str
             The `externalId` previously passed to `user.activity.set`.
@@ -1064,8 +2524,9 @@ class AsyncRawUsersClient:
         Parameters
         ----------
         user_id : str
-            Target user. Bare or tagged UUID. Personal tokens may only pass
-            their own user.
+            Target user. Bare UUID, tagged `U-…` ID, or ASCII email
+            (same convention as `group.create` members). Personal tokens
+            may only pass their own user.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.

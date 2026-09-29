@@ -8,16 +8,8 @@ import typing
 from importlib import import_module
 
 if typing.TYPE_CHECKING:
-    from .user_activity_list_response import UserActivityListResponse
-    from .user_status_set_request_will_return import UserStatusSetRequestWillReturn
-    from .user_status_set_response import UserStatusSetResponse
-    from .user_status_set_response_status import UserStatusSetResponseStatus
-_dynamic_imports: typing.Dict[str, str] = {
-    "UserActivityListResponse": ".user_activity_list_response",
-    "UserStatusSetRequestWillReturn": ".user_status_set_request_will_return",
-    "UserStatusSetResponse": ".user_status_set_response",
-    "UserStatusSetResponseStatus": ".user_status_set_response_status",
-}
+    from .types import GuestBadgeListResponse, GuestBadgeRevokeResponse
+_dynamic_imports: typing.Dict[str, str] = {"GuestBadgeListResponse": ".types", "GuestBadgeRevokeResponse": ".types"}
 
 
 def __getattr__(attr_name: str) -> typing.Any:
@@ -41,9 +33,4 @@ def __dir__():
     return sorted(lazy_attrs)
 
 
-__all__ = [
-    "UserActivityListResponse",
-    "UserStatusSetRequestWillReturn",
-    "UserStatusSetResponse",
-    "UserStatusSetResponseStatus",
-]
+__all__ = ["GuestBadgeListResponse", "GuestBadgeRevokeResponse"]
