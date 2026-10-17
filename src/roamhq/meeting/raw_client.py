@@ -188,8 +188,10 @@ class RawMeetingClient:
 
         Participants are included inline up to the `maxParticipants` limit. For meetings with more participants, use [`/meeting.participants`](https://developer.ro.am/docs/api/meeting-participants) to paginate through the full list.
 
-        **Access:** Organization and Personal. Personal tokens are limited to meetings
-        the authenticated user participated in. Organization tokens without
+        **Access:** Organization and Personal. Personal tokens can read any meeting
+        the authenticated user can view in Roam: ones they participated in, plus
+        ones shared with them, such as through a [folder](https://developer.ro.am/docs/api/folder-contents).
+        Organization tokens without
         [`admin:meetings:read`](https://developer.ro.am/docs/guides/scopes#meeting-width-adminmeetingsread)
         are limited to meetings the install's bot has access to.
 
@@ -320,7 +322,7 @@ class RawMeetingClient:
         from a previous response as `cursor` to fetch the next page. Invalid cursors
         return `error: "invalid_cursor"` — see [Responses and Errors](https://developer.ro.am/docs/guides/responses-and-errors).
 
-        **Access:** Organization and Personal. Personal access tokens restrict to meetings the authenticated user participated in.
+        **Access:** Organization and Personal. Personal tokens can read any meeting the authenticated user can view in Roam: ones they participated in, plus ones shared with them, such as through a [folder](https://developer.ro.am/docs/api/folder-contents).
 
         **Required scope:** `meetings:read` and `user:read` (add `user:read.email` for participant emails)
 
@@ -448,7 +450,7 @@ class RawMeetingClient:
         - **JSON** (default): Returns structured transcript with cues containing speaker IDs, text, and timing
         - **WebVTT**: Set `Accept: text/vtt` header to receive standard WebVTT format with speaker voice tags
 
-        **Access:** Organization and Personal. Personal access tokens restrict to meetings the authenticated user participated in.
+        **Access:** Organization and Personal. Personal tokens can read any meeting the authenticated user can view in Roam: ones they participated in, plus ones shared with them, such as through a [folder](https://developer.ro.am/docs/api/folder-contents).
 
         **Required scope:** `meetings:read`
 
@@ -707,7 +709,7 @@ class RawMeetingClient:
         """
         Ask an AI question about a meeting's transcript content. Returns a natural language response based on the meeting transcript.
 
-        **Access:** Organization and Personal. Personal access tokens restrict to meetings the authenticated user participated in.
+        **Access:** Organization and Personal. Personal tokens can read any meeting the authenticated user can view in Roam: ones they participated in, plus ones shared with them, such as through a [folder](https://developer.ro.am/docs/api/folder-contents).
 
         **Required scope:** `meetings:read`
 
@@ -1478,8 +1480,10 @@ class AsyncRawMeetingClient:
 
         Participants are included inline up to the `maxParticipants` limit. For meetings with more participants, use [`/meeting.participants`](https://developer.ro.am/docs/api/meeting-participants) to paginate through the full list.
 
-        **Access:** Organization and Personal. Personal tokens are limited to meetings
-        the authenticated user participated in. Organization tokens without
+        **Access:** Organization and Personal. Personal tokens can read any meeting
+        the authenticated user can view in Roam: ones they participated in, plus
+        ones shared with them, such as through a [folder](https://developer.ro.am/docs/api/folder-contents).
+        Organization tokens without
         [`admin:meetings:read`](https://developer.ro.am/docs/guides/scopes#meeting-width-adminmeetingsread)
         are limited to meetings the install's bot has access to.
 
@@ -1610,7 +1614,7 @@ class AsyncRawMeetingClient:
         from a previous response as `cursor` to fetch the next page. Invalid cursors
         return `error: "invalid_cursor"` — see [Responses and Errors](https://developer.ro.am/docs/guides/responses-and-errors).
 
-        **Access:** Organization and Personal. Personal access tokens restrict to meetings the authenticated user participated in.
+        **Access:** Organization and Personal. Personal tokens can read any meeting the authenticated user can view in Roam: ones they participated in, plus ones shared with them, such as through a [folder](https://developer.ro.am/docs/api/folder-contents).
 
         **Required scope:** `meetings:read` and `user:read` (add `user:read.email` for participant emails)
 
@@ -1738,7 +1742,7 @@ class AsyncRawMeetingClient:
         - **JSON** (default): Returns structured transcript with cues containing speaker IDs, text, and timing
         - **WebVTT**: Set `Accept: text/vtt` header to receive standard WebVTT format with speaker voice tags
 
-        **Access:** Organization and Personal. Personal access tokens restrict to meetings the authenticated user participated in.
+        **Access:** Organization and Personal. Personal tokens can read any meeting the authenticated user can view in Roam: ones they participated in, plus ones shared with them, such as through a [folder](https://developer.ro.am/docs/api/folder-contents).
 
         **Required scope:** `meetings:read`
 
@@ -1997,7 +2001,7 @@ class AsyncRawMeetingClient:
         """
         Ask an AI question about a meeting's transcript content. Returns a natural language response based on the meeting transcript.
 
-        **Access:** Organization and Personal. Personal access tokens restrict to meetings the authenticated user participated in.
+        **Access:** Organization and Personal. Personal tokens can read any meeting the authenticated user can view in Roam: ones they participated in, plus ones shared with them, such as through a [folder](https://developer.ro.am/docs/api/folder-contents).
 
         **Required scope:** `meetings:read`
 

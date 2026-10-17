@@ -1969,6 +1969,7 @@ class RawChatClient:
         thread_timestamp: typing.Optional[float] = None,
         after: typing.Optional[str] = None,
         before: typing.Optional[str] = None,
+        ascending: typing.Optional[bool] = None,
         cursor: typing.Optional[str] = None,
         limit: typing.Optional[int] = None,
         expand: typing.Optional[str] = None,
@@ -1986,13 +1987,21 @@ class RawChatClient:
 
         You must specify exactly one destination. Specifying multiple (e.g., both `chatId` and `groupId`) will return a 400 error.
 
-        The ordering of results depends on the filter specified:
+        The ordering of results depends on `ascending` and `after`:
 
-        - When no parameters are provided, the most recent messages are returned,
-          sorted in reverse chronological order. This is equivalent to specifying `before`
-          as NOW and leaving `after` unspecified.
+        - `ascending=true` sorts in forward chronological order (oldest first).
+          `ascending=false` sorts in reverse chronological order (newest first),
+          even when `after` is specified.
 
-        - If `after` is specified, the results are sorted in forward chronological order.
+        - When `ascending` is omitted and `after` is not specified, the most recent
+          messages are returned in reverse chronological order. This is equivalent
+          to specifying `before` as NOW and leaving `after` unspecified.
+
+        - When `ascending` is omitted and `after` is specified, the results are
+          sorted in forward chronological order.
+
+        Send the same `ascending` value on every page. The cursor marks where to
+        resume, not which direction to sort.
 
         Either dates or datetimes may be specified. Date-only inputs (`YYYY-MM-DD`)
         are interpreted in the caller's timezone (see
@@ -2034,6 +2043,13 @@ class RawChatClient:
             Sub-millisecond precision on datetimes is truncated. Defaults to
             "now".
 
+        ascending : typing.Optional[bool]
+            `true` sorts oldest-first. `false` sorts newest-first, even when
+            `after` is set. When omitted, results are oldest-first if `after` is
+            set and newest-first otherwise. Send the same value on every page;
+            the cursor does not carry the direction. Accepts `true`/`false` or
+            `1`/`0`.
+
         cursor : typing.Optional[str]
             Opaque pagination cursor from a previous response's `nextCursor`.
 
@@ -2063,6 +2079,7 @@ class RawChatClient:
                 "threadTimestamp": thread_timestamp,
                 "after": after,
                 "before": before,
+                "ascending": ascending,
                 "cursor": cursor,
                 "limit": limit,
                 "expand": expand,
@@ -4758,6 +4775,7 @@ class AsyncRawChatClient:
         thread_timestamp: typing.Optional[float] = None,
         after: typing.Optional[str] = None,
         before: typing.Optional[str] = None,
+        ascending: typing.Optional[bool] = None,
         cursor: typing.Optional[str] = None,
         limit: typing.Optional[int] = None,
         expand: typing.Optional[str] = None,
@@ -4775,13 +4793,21 @@ class AsyncRawChatClient:
 
         You must specify exactly one destination. Specifying multiple (e.g., both `chatId` and `groupId`) will return a 400 error.
 
-        The ordering of results depends on the filter specified:
+        The ordering of results depends on `ascending` and `after`:
 
-        - When no parameters are provided, the most recent messages are returned,
-          sorted in reverse chronological order. This is equivalent to specifying `before`
-          as NOW and leaving `after` unspecified.
+        - `ascending=true` sorts in forward chronological order (oldest first).
+          `ascending=false` sorts in reverse chronological order (newest first),
+          even when `after` is specified.
 
-        - If `after` is specified, the results are sorted in forward chronological order.
+        - When `ascending` is omitted and `after` is not specified, the most recent
+          messages are returned in reverse chronological order. This is equivalent
+          to specifying `before` as NOW and leaving `after` unspecified.
+
+        - When `ascending` is omitted and `after` is specified, the results are
+          sorted in forward chronological order.
+
+        Send the same `ascending` value on every page. The cursor marks where to
+        resume, not which direction to sort.
 
         Either dates or datetimes may be specified. Date-only inputs (`YYYY-MM-DD`)
         are interpreted in the caller's timezone (see
@@ -4823,6 +4849,13 @@ class AsyncRawChatClient:
             Sub-millisecond precision on datetimes is truncated. Defaults to
             "now".
 
+        ascending : typing.Optional[bool]
+            `true` sorts oldest-first. `false` sorts newest-first, even when
+            `after` is set. When omitted, results are oldest-first if `after` is
+            set and newest-first otherwise. Send the same value on every page;
+            the cursor does not carry the direction. Accepts `true`/`false` or
+            `1`/`0`.
+
         cursor : typing.Optional[str]
             Opaque pagination cursor from a previous response's `nextCursor`.
 
@@ -4852,6 +4885,7 @@ class AsyncRawChatClient:
                 "threadTimestamp": thread_timestamp,
                 "after": after,
                 "before": before,
+                "ascending": ascending,
                 "cursor": cursor,
                 "limit": limit,
                 "expand": expand,
