@@ -10,7 +10,7 @@ from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
 from ..core.serialization import FieldMetadata
 from .user_status import UserStatus
 from .user_type import UserType
-from .user_will_return import UserWillReturn
+from .will_return import WillReturn
 
 
 class User(UniversalBaseModel):
@@ -92,15 +92,15 @@ class User(UniversalBaseModel):
     """
 
     will_return: typing_extensions.Annotated[
-        typing.Optional[UserWillReturn],
+        typing.Optional[WillReturn],
         FieldMetadata(alias="willReturn"),
         pydantic.Field(
             alias="willReturn",
-            description='Out-of-office / "Will Return" status. Present only when `expand=status` is requested, the `user:read.status` scope is granted, and the user has a future return time. A user can be `checkedIn` and still have `willReturn` (multi-day Out of Roam) — key off the presence of this object rather than `status` alone.',
+            description="Present only when `expand=status` is requested, the `user:read.status` scope is granted, and the user has a future return time. Write it with [`user.status.set`](https://developer.ro.am/docs/api/user-status-set) / [`.clear`](https://developer.ro.am/docs/api/user-status-clear).",
         ),
     ] = None
     """
-    Out-of-office / "Will Return" status. Present only when `expand=status` is requested, the `user:read.status` scope is granted, and the user has a future return time. A user can be `checkedIn` and still have `willReturn` (multi-day Out of Roam) — key off the presence of this object rather than `status` alone.
+    Present only when `expand=status` is requested, the `user:read.status` scope is granted, and the user has a future return time. Write it with [`user.status.set`](https://developer.ro.am/docs/api/user-status-set) / [`.clear`](https://developer.ro.am/docs/api/user-status-clear).
     """
 
     available: typing.Optional[bool] = pydantic.Field(default=None)

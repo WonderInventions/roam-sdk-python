@@ -11,6 +11,7 @@ from ..types.webhook_subscription_filter import WebhookSubscriptionFilter
 from .raw_client import AsyncRawWebhookClient, RawWebhookClient
 from .types.deliveries_webhook_response import DeliveriesWebhookResponse
 from .types.list_webhook_response import ListWebhookResponse
+from .types.webhook_subscription_request_destination import WebhookSubscriptionRequestDestination
 from .types.webhook_subscription_request_event import WebhookSubscriptionRequestEvent
 
 # this is used as the default value for optional parameters
@@ -76,6 +77,7 @@ class WebhookClient:
         event: WebhookSubscriptionRequestEvent,
         filter: typing.Optional[WebhookSubscriptionFilter] = OMIT,
         api_version: typing.Optional[str] = OMIT,
+        destination: typing.Optional[WebhookSubscriptionRequestDestination] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Webhook:
         """
@@ -92,7 +94,37 @@ class WebhookClient:
         Roam does not probe the destination URL when you subscribe — the
         subscription is created immediately and the first delivery is a real event.
 
-        See the [Webhooks overview](https://developer.ro.am/docs/webhooks/webhooks) for the full list of event names and their filters.
+        Optional `filter` limits which occurrences are delivered. Which keys are
+        valid depends on `event` — see that event's page and the
+        [Event Filters](https://developer.ro.am/docs/webhooks/webhooks#event-filters) table. Omit
+        `filter` to receive every occurrence. An empty object (`{}`) is rejected,
+        as is a filter that does not apply to the event.
+
+        **DMs only:**
+
+        ```json
+        {
+          "url": "https://example.com/hooks/messages",
+          "event": "chat.message",
+          "filter": { "chatType": "dm" }
+        }
+        ```
+
+        **Grok Bot routine** (no ngrok). `destination.token` is write-only — list
+        and subscribe responses echo `destination.type` only. See
+        [Grok](https://developer.ro.am/docs/integrations/grok).
+
+        ```json
+        {
+          "url": "https://api2.cursor.sh/automations/webhook/<id>",
+          "event": "chat.message",
+          "filter": { "self": true },
+          "destination": {
+            "type": "grok_bot",
+            "token": "<Grok routine sender key or whsec_…>"
+          }
+        }
+        ```
 
         **Required scope:** `webhook:write`
 
@@ -105,12 +137,27 @@ class WebhookClient:
             Event to subscribe to.
 
         filter : typing.Optional[WebhookSubscriptionFilter]
+            Optional event-specific filter. Which keys are valid depends on `event`
+            (see the schema). Omit to receive every occurrence; `{}` and `null` are
+            rejected rather than treated as "omitted". Example for DMs only:
+            `{"chatType": "dm"}`.
 
         api_version : typing.Optional[str]
             Optional [API version](https://developer.ro.am/docs/guides/api-versioning) (`YYYY-MM-DD`) to pin
             this subscription's payload shape to. When omitted, the subscription is
             frozen at your integration's default version. Unsupported values return
             `400`.
+
+        destination : typing.Optional[WebhookSubscriptionRequestDestination]
+            Optional delivery authentication. Omit for Standard Webhooks signed with
+            the API client's `whsec_`. Set `type` to `grok_bot` to deliver to a
+            [Grok Bot](https://developer.ro.am/docs/integrations/grok) webhook-routine URL: Roam signs with
+            the routine's sender key (`Authorization: Bearer` plus
+            `X-Grok-Signature`) or, if `token` is a `whsec_…` Standard Webhooks
+            secret, uses that secret instead of the API client's. The token is
+            write-only — subscribe and list responses echo `destination.type` only.
+            Re-subscribe without this field leaves existing destination auth
+            unchanged; send `"type": ""` to clear it.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -122,7 +169,7 @@ class WebhookClient:
 
         Examples
         --------
-        from roamhq import RoamClient, WebhookSubscriptionFilter
+        from roamhq import RoamClient
 
         client = RoamClient(
             roam_version="YOUR_ROAM_VERSION",
@@ -131,13 +178,15 @@ class WebhookClient:
         client.webhook.subscribe(
             url="https://example.com/hooks/messages",
             event="chat.message",
-            filter=WebhookSubscriptionFilter(
-                mention=True,
-            ),
         )
         """
         _response = self._raw_client.subscribe(
-            url=url, event=event, filter=filter, api_version=api_version, request_options=request_options
+            url=url,
+            event=event,
+            filter=filter,
+            api_version=api_version,
+            destination=destination,
+            request_options=request_options,
         )
         return _response.data
 
@@ -186,15 +235,17 @@ class WebhookClient:
         event: typing.Optional[str] = None,
         after: typing.Optional[str] = None,
         before: typing.Optional[str] = None,
+        ascending: typing.Optional[bool] = None,
         limit: typing.Optional[int] = None,
         cursor: typing.Optional[str] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> DeliveriesWebhookResponse:
         """
         List recent **failed** webhook delivery attempts for the authenticated API
-        client, newest first. Use this to debug a misbehaving endpoint and to find
-        the events you need to replay: successful (2xx) deliveries are never
-        recorded, so every row here is a delivery your endpoint did not accept.
+        client, newest first by default (see `ascending`). Use this to debug a
+        misbehaving endpoint and to find the events you need to replay:
+        successful (2xx) deliveries are never recorded, so every row here is a
+        delivery your endpoint did not accept.
 
         Timeouts are first-class failures: `statusCode` is `0` and `error` is
         `timeout`. For HTTP error responses, a truncated copy of your server's
@@ -218,10 +269,17 @@ class WebhookClient:
             Only return deliveries for this event name (e.g. `chat.message`).
 
         after : typing.Optional[str]
-            Only return deliveries after this time (RFC3339 or `YYYY-MM-DD`). Results switch to oldest-first.
+            Only return deliveries after this time (RFC3339 or `YYYY-MM-DD`). When `ascending` is omitted, results switch to oldest-first.
 
         before : typing.Optional[str]
             Only return deliveries before this time (RFC3339 or `YYYY-MM-DD`).
+
+        ascending : typing.Optional[bool]
+            `true` sorts oldest-first. `false` sorts newest-first, even when
+            `after` is set. When omitted, results are oldest-first if `after` is
+            set and newest-first otherwise. Send the same value on every page;
+            the cursor does not carry the direction. Accepts `true`/`false` or
+            `1`/`0`.
 
         limit : typing.Optional[int]
             Maximum number of deliveries to return.
@@ -252,6 +310,7 @@ class WebhookClient:
             event=event,
             after=after,
             before=before,
+            ascending=ascending,
             limit=limit,
             cursor=cursor,
             request_options=request_options,
@@ -326,6 +385,7 @@ class AsyncWebhookClient:
         event: WebhookSubscriptionRequestEvent,
         filter: typing.Optional[WebhookSubscriptionFilter] = OMIT,
         api_version: typing.Optional[str] = OMIT,
+        destination: typing.Optional[WebhookSubscriptionRequestDestination] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> Webhook:
         """
@@ -342,7 +402,37 @@ class AsyncWebhookClient:
         Roam does not probe the destination URL when you subscribe — the
         subscription is created immediately and the first delivery is a real event.
 
-        See the [Webhooks overview](https://developer.ro.am/docs/webhooks/webhooks) for the full list of event names and their filters.
+        Optional `filter` limits which occurrences are delivered. Which keys are
+        valid depends on `event` — see that event's page and the
+        [Event Filters](https://developer.ro.am/docs/webhooks/webhooks#event-filters) table. Omit
+        `filter` to receive every occurrence. An empty object (`{}`) is rejected,
+        as is a filter that does not apply to the event.
+
+        **DMs only:**
+
+        ```json
+        {
+          "url": "https://example.com/hooks/messages",
+          "event": "chat.message",
+          "filter": { "chatType": "dm" }
+        }
+        ```
+
+        **Grok Bot routine** (no ngrok). `destination.token` is write-only — list
+        and subscribe responses echo `destination.type` only. See
+        [Grok](https://developer.ro.am/docs/integrations/grok).
+
+        ```json
+        {
+          "url": "https://api2.cursor.sh/automations/webhook/<id>",
+          "event": "chat.message",
+          "filter": { "self": true },
+          "destination": {
+            "type": "grok_bot",
+            "token": "<Grok routine sender key or whsec_…>"
+          }
+        }
+        ```
 
         **Required scope:** `webhook:write`
 
@@ -355,12 +445,27 @@ class AsyncWebhookClient:
             Event to subscribe to.
 
         filter : typing.Optional[WebhookSubscriptionFilter]
+            Optional event-specific filter. Which keys are valid depends on `event`
+            (see the schema). Omit to receive every occurrence; `{}` and `null` are
+            rejected rather than treated as "omitted". Example for DMs only:
+            `{"chatType": "dm"}`.
 
         api_version : typing.Optional[str]
             Optional [API version](https://developer.ro.am/docs/guides/api-versioning) (`YYYY-MM-DD`) to pin
             this subscription's payload shape to. When omitted, the subscription is
             frozen at your integration's default version. Unsupported values return
             `400`.
+
+        destination : typing.Optional[WebhookSubscriptionRequestDestination]
+            Optional delivery authentication. Omit for Standard Webhooks signed with
+            the API client's `whsec_`. Set `type` to `grok_bot` to deliver to a
+            [Grok Bot](https://developer.ro.am/docs/integrations/grok) webhook-routine URL: Roam signs with
+            the routine's sender key (`Authorization: Bearer` plus
+            `X-Grok-Signature`) or, if `token` is a `whsec_…` Standard Webhooks
+            secret, uses that secret instead of the API client's. The token is
+            write-only — subscribe and list responses echo `destination.type` only.
+            Re-subscribe without this field leaves existing destination auth
+            unchanged; send `"type": ""` to clear it.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -374,7 +479,7 @@ class AsyncWebhookClient:
         --------
         import asyncio
 
-        from roamhq import AsyncRoamClient, WebhookSubscriptionFilter
+        from roamhq import AsyncRoamClient
 
         client = AsyncRoamClient(
             roam_version="YOUR_ROAM_VERSION",
@@ -386,16 +491,18 @@ class AsyncWebhookClient:
             await client.webhook.subscribe(
                 url="https://example.com/hooks/messages",
                 event="chat.message",
-                filter=WebhookSubscriptionFilter(
-                    mention=True,
-                ),
             )
 
 
         asyncio.run(main())
         """
         _response = await self._raw_client.subscribe(
-            url=url, event=event, filter=filter, api_version=api_version, request_options=request_options
+            url=url,
+            event=event,
+            filter=filter,
+            api_version=api_version,
+            destination=destination,
+            request_options=request_options,
         )
         return _response.data
 
@@ -452,15 +559,17 @@ class AsyncWebhookClient:
         event: typing.Optional[str] = None,
         after: typing.Optional[str] = None,
         before: typing.Optional[str] = None,
+        ascending: typing.Optional[bool] = None,
         limit: typing.Optional[int] = None,
         cursor: typing.Optional[str] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> DeliveriesWebhookResponse:
         """
         List recent **failed** webhook delivery attempts for the authenticated API
-        client, newest first. Use this to debug a misbehaving endpoint and to find
-        the events you need to replay: successful (2xx) deliveries are never
-        recorded, so every row here is a delivery your endpoint did not accept.
+        client, newest first by default (see `ascending`). Use this to debug a
+        misbehaving endpoint and to find the events you need to replay:
+        successful (2xx) deliveries are never recorded, so every row here is a
+        delivery your endpoint did not accept.
 
         Timeouts are first-class failures: `statusCode` is `0` and `error` is
         `timeout`. For HTTP error responses, a truncated copy of your server's
@@ -484,10 +593,17 @@ class AsyncWebhookClient:
             Only return deliveries for this event name (e.g. `chat.message`).
 
         after : typing.Optional[str]
-            Only return deliveries after this time (RFC3339 or `YYYY-MM-DD`). Results switch to oldest-first.
+            Only return deliveries after this time (RFC3339 or `YYYY-MM-DD`). When `ascending` is omitted, results switch to oldest-first.
 
         before : typing.Optional[str]
             Only return deliveries before this time (RFC3339 or `YYYY-MM-DD`).
+
+        ascending : typing.Optional[bool]
+            `true` sorts oldest-first. `false` sorts newest-first, even when
+            `after` is set. When omitted, results are oldest-first if `after` is
+            set and newest-first otherwise. Send the same value on every page;
+            the cursor does not carry the direction. Accepts `true`/`false` or
+            `1`/`0`.
 
         limit : typing.Optional[int]
             Maximum number of deliveries to return.
@@ -526,6 +642,7 @@ class AsyncWebhookClient:
             event=event,
             after=after,
             before=before,
+            ascending=ascending,
             limit=limit,
             cursor=cursor,
             request_options=request_options,

@@ -6,7 +6,7 @@
     "package_name": "roamhq",
     "client_class_name": "RoamClient"
   },
-  "originGitCommit": "e226955133092595744390682ba317d4ee33f224",
+  "originGitCommit": "8aea7d308c466cfb3365aaa0bd427402caf92edd",
   "originGitCommitIsDirty": false,
   "invokedBy": "ci",
   "ciProvider": "github"

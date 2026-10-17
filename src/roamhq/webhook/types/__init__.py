@@ -12,12 +12,16 @@ if typing.TYPE_CHECKING:
     from .deliveries_webhook_response_deliveries_item import DeliveriesWebhookResponseDeliveriesItem
     from .list_webhook_response import ListWebhookResponse
     from .list_webhook_response_webhooks_item import ListWebhookResponseWebhooksItem
+    from .webhook_subscription_request_destination import WebhookSubscriptionRequestDestination
+    from .webhook_subscription_request_destination_type import WebhookSubscriptionRequestDestinationType
     from .webhook_subscription_request_event import WebhookSubscriptionRequestEvent
 _dynamic_imports: typing.Dict[str, str] = {
     "DeliveriesWebhookResponse": ".deliveries_webhook_response",
     "DeliveriesWebhookResponseDeliveriesItem": ".deliveries_webhook_response_deliveries_item",
     "ListWebhookResponse": ".list_webhook_response",
     "ListWebhookResponseWebhooksItem": ".list_webhook_response_webhooks_item",
+    "WebhookSubscriptionRequestDestination": ".webhook_subscription_request_destination",
+    "WebhookSubscriptionRequestDestinationType": ".webhook_subscription_request_destination_type",
     "WebhookSubscriptionRequestEvent": ".webhook_subscription_request_event",
 }
 
@@ -48,5 +52,7 @@ __all__ = [
     "DeliveriesWebhookResponseDeliveriesItem",
     "ListWebhookResponse",
     "ListWebhookResponseWebhooksItem",
+    "WebhookSubscriptionRequestDestination",
+    "WebhookSubscriptionRequestDestinationType",
     "WebhookSubscriptionRequestEvent",
 ]
