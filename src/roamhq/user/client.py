@@ -78,7 +78,7 @@ class UserClient:
             Opaque directory cursor from a previous response's `nextCursor`. Cannot be combined with `ids`.
 
         expand : typing.Optional[str]
-            Comma-separated list of additional fields. Supported: `status` (requires `user:read.status`). Expanding `status` also returns `willReturn` when set.
+            Comma-separated list of additional fields. Supported: `status` (requires `user:read.status`). Expanding `status` also returns `willReturn` when set. Write that field with `user.status.set` / `.clear`.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -115,7 +115,7 @@ class UserClient:
         Resolve a v1 principal by ID, or look up a workspace member by email.
 
         ID lookup resolves active or archived members, guests, and authorized
-        automated actors (classic bots, agents, assistants, and coworkers). The
+        automated actors (classic bots, agents, and assistants). The
         response always includes `type: "user" | "bot"`; guests additionally have
         `isGuest: true`. Groups, unknown IDs, and automated actors outside the
         caller's Roam/account/owner boundary return `user_not_found`.
@@ -141,7 +141,7 @@ class UserClient:
             The user's email address. Mutually exclusive with `id`. Requires `user:read.email` scope.
 
         expand : typing.Optional[str]
-            Comma-separated list of additional fields to include. Supported: `status`, `available` (each requires `user:read.status`). Expanding `status` also returns `willReturn` when the user has a future out-of-office entry.
+            Comma-separated list of additional fields to include. Supported: `status`, `available` (each requires `user:read.status`). Expanding `status` also returns `willReturn` when the user has a future out-of-office entry. Write that field with `user.status.set` / `.clear`.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -232,7 +232,7 @@ class AsyncUserClient:
             Opaque directory cursor from a previous response's `nextCursor`. Cannot be combined with `ids`.
 
         expand : typing.Optional[str]
-            Comma-separated list of additional fields. Supported: `status` (requires `user:read.status`). Expanding `status` also returns `willReturn` when set.
+            Comma-separated list of additional fields. Supported: `status` (requires `user:read.status`). Expanding `status` also returns `willReturn` when set. Write that field with `user.status.set` / `.clear`.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -277,7 +277,7 @@ class AsyncUserClient:
         Resolve a v1 principal by ID, or look up a workspace member by email.
 
         ID lookup resolves active or archived members, guests, and authorized
-        automated actors (classic bots, agents, assistants, and coworkers). The
+        automated actors (classic bots, agents, and assistants). The
         response always includes `type: "user" | "bot"`; guests additionally have
         `isGuest: true`. Groups, unknown IDs, and automated actors outside the
         caller's Roam/account/owner boundary return `user_not_found`.
@@ -303,7 +303,7 @@ class AsyncUserClient:
             The user's email address. Mutually exclusive with `id`. Requires `user:read.email` scope.
 
         expand : typing.Optional[str]
-            Comma-separated list of additional fields to include. Supported: `status`, `available` (each requires `user:read.status`). Expanding `status` also returns `willReturn` when the user has a future out-of-office entry.
+            Comma-separated list of additional fields to include. Supported: `status`, `available` (each requires `user:read.status`). Expanding `status` also returns `willReturn` when the user has a future out-of-office entry. Write that field with `user.status.set` / `.clear`.
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.

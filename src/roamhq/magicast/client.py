@@ -38,7 +38,9 @@ class MagicastClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> ListMagicastResponse:
         """
-        List Magicasts in your account, most recent first.
+        List Magicasts in your account. Results are most recent first when
+        neither `ascending` nor `after` is set. See `ascending` to change the
+        order.
 
         Returns metadata only (`id`, `name`, `createdAt`, `ownerId`,
         `coverImageUrl`). Use [`/magicast.info`](https://developer.ro.am/docs/api/magicast-info) for
@@ -53,13 +55,17 @@ class MagicastClient:
         Parameters
         ----------
         after : typing.Optional[dt.datetime]
-            Only return magicasts created after this time (RFC-3339).
+            Only return magicasts created after this time (RFC-3339). When `ascending` is omitted, this also sorts oldest-first.
 
         before : typing.Optional[dt.datetime]
             Only return magicasts created before this time (RFC-3339).
 
         ascending : typing.Optional[bool]
-            Sort oldest-first instead of newest-first.
+            `true` sorts oldest-first. `false` sorts newest-first, even when
+            `after` is set. When omitted, results are oldest-first if `after` is
+            set and newest-first otherwise. Send the same value on every page;
+            the cursor does not carry the direction. Accepts `true`/`false` or
+            `1`/`0`.
 
         limit : typing.Optional[int]
             Number of magicasts to return per response. Default 10.
@@ -111,7 +117,9 @@ class MagicastClient:
 
         **Access:** Organization and Personal. Organization tokens can read every
         Magicast in the account, including ones the creator never shared. Personal
-        tokens are restricted to Magicasts owned by the authenticated user. Filter
+        tokens can read Magicasts in the account that the authenticated user can
+        view in Roam: their own, plus ones shared with them, such as through a
+        [folder](https://developer.ro.am/docs/api/folder-contents). Filter
         on whether `shareUrl` is present if you only want shared recordings.
 
         **Required scope:** `magicast:read`
@@ -171,7 +179,9 @@ class AsyncMagicastClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> ListMagicastResponse:
         """
-        List Magicasts in your account, most recent first.
+        List Magicasts in your account. Results are most recent first when
+        neither `ascending` nor `after` is set. See `ascending` to change the
+        order.
 
         Returns metadata only (`id`, `name`, `createdAt`, `ownerId`,
         `coverImageUrl`). Use [`/magicast.info`](https://developer.ro.am/docs/api/magicast-info) for
@@ -186,13 +196,17 @@ class AsyncMagicastClient:
         Parameters
         ----------
         after : typing.Optional[dt.datetime]
-            Only return magicasts created after this time (RFC-3339).
+            Only return magicasts created after this time (RFC-3339). When `ascending` is omitted, this also sorts oldest-first.
 
         before : typing.Optional[dt.datetime]
             Only return magicasts created before this time (RFC-3339).
 
         ascending : typing.Optional[bool]
-            Sort oldest-first instead of newest-first.
+            `true` sorts oldest-first. `false` sorts newest-first, even when
+            `after` is set. When omitted, results are oldest-first if `after` is
+            set and newest-first otherwise. Send the same value on every page;
+            the cursor does not carry the direction. Accepts `true`/`false` or
+            `1`/`0`.
 
         limit : typing.Optional[int]
             Number of magicasts to return per response. Default 10.
@@ -252,7 +266,9 @@ class AsyncMagicastClient:
 
         **Access:** Organization and Personal. Organization tokens can read every
         Magicast in the account, including ones the creator never shared. Personal
-        tokens are restricted to Magicasts owned by the authenticated user. Filter
+        tokens can read Magicasts in the account that the authenticated user can
+        view in Roam: their own, plus ones shared with them, such as through a
+        [folder](https://developer.ro.am/docs/api/folder-contents). Filter
         on whether `shareUrl` is present if you only want shared recordings.
 
         **Required scope:** `magicast:read`

@@ -14,8 +14,10 @@ if typing.TYPE_CHECKING:
     from .calendar.client import AsyncCalendarClient, CalendarClient
     from .chat.client import AsyncChatClient, ChatClient
     from .conversation.client import AsyncConversationClient, ConversationClient
+    from .folder.client import AsyncFolderClient, FolderClient
     from .group.client import AsyncGroupClient, GroupClient
     from .groups.client import AsyncGroupsClient, GroupsClient
+    from .guest_badges.client import AsyncGuestBadgesClient, GuestBadgesClient
     from .item.client import AsyncItemClient, ItemClient
     from .lobby.client import AsyncLobbyClient, LobbyClient
     from .magicast.client import AsyncMagicastClient, MagicastClient
@@ -24,6 +26,7 @@ if typing.TYPE_CHECKING:
     from .meetings.client import AsyncMeetingsClient, MeetingsClient
     from .reaction.client import AsyncReactionClient, ReactionClient
     from .story.client import AsyncStoryClient, StoryClient
+    from .ticker.client import AsyncTickerClient, TickerClient
     from .token.client import AsyncTokenClient, TokenClient
     from .user.client import AsyncUserClient, UserClient
     from .user_audit_log.client import AsyncUserAuditLogClient, UserAuditLogClient
@@ -134,8 +137,11 @@ class RoamClient:
         self._lobby: typing.Optional[LobbyClient] = None
         self._magicast: typing.Optional[MagicastClient] = None
         self._magicasts: typing.Optional[MagicastsClient] = None
+        self._folder: typing.Optional[FolderClient] = None
+        self._ticker: typing.Optional[TickerClient] = None
         self._group: typing.Optional[GroupClient] = None
         self._groups: typing.Optional[GroupsClient] = None
+        self._guest_badges: typing.Optional[GuestBadgesClient] = None
         self._token: typing.Optional[TokenClient] = None
         self._webhook: typing.Optional[WebhookClient] = None
 
@@ -260,6 +266,22 @@ class RoamClient:
         return self._magicasts
 
     @property
+    def folder(self):
+        if self._folder is None:
+            from .folder.client import FolderClient  # noqa: E402
+
+            self._folder = FolderClient(client_wrapper=self._client_wrapper)
+        return self._folder
+
+    @property
+    def ticker(self):
+        if self._ticker is None:
+            from .ticker.client import TickerClient  # noqa: E402
+
+            self._ticker = TickerClient(client_wrapper=self._client_wrapper)
+        return self._ticker
+
+    @property
     def group(self):
         if self._group is None:
             from .group.client import GroupClient  # noqa: E402
@@ -274,6 +296,14 @@ class RoamClient:
 
             self._groups = GroupsClient(client_wrapper=self._client_wrapper)
         return self._groups
+
+    @property
+    def guest_badges(self):
+        if self._guest_badges is None:
+            from .guest_badges.client import GuestBadgesClient  # noqa: E402
+
+            self._guest_badges = GuestBadgesClient(client_wrapper=self._client_wrapper)
+        return self._guest_badges
 
     @property
     def token(self):
@@ -416,8 +446,11 @@ class AsyncRoamClient:
         self._lobby: typing.Optional[AsyncLobbyClient] = None
         self._magicast: typing.Optional[AsyncMagicastClient] = None
         self._magicasts: typing.Optional[AsyncMagicastsClient] = None
+        self._folder: typing.Optional[AsyncFolderClient] = None
+        self._ticker: typing.Optional[AsyncTickerClient] = None
         self._group: typing.Optional[AsyncGroupClient] = None
         self._groups: typing.Optional[AsyncGroupsClient] = None
+        self._guest_badges: typing.Optional[AsyncGuestBadgesClient] = None
         self._token: typing.Optional[AsyncTokenClient] = None
         self._webhook: typing.Optional[AsyncWebhookClient] = None
 
@@ -542,6 +575,22 @@ class AsyncRoamClient:
         return self._magicasts
 
     @property
+    def folder(self):
+        if self._folder is None:
+            from .folder.client import AsyncFolderClient  # noqa: E402
+
+            self._folder = AsyncFolderClient(client_wrapper=self._client_wrapper)
+        return self._folder
+
+    @property
+    def ticker(self):
+        if self._ticker is None:
+            from .ticker.client import AsyncTickerClient  # noqa: E402
+
+            self._ticker = AsyncTickerClient(client_wrapper=self._client_wrapper)
+        return self._ticker
+
+    @property
     def group(self):
         if self._group is None:
             from .group.client import AsyncGroupClient  # noqa: E402
@@ -556,6 +605,14 @@ class AsyncRoamClient:
 
             self._groups = AsyncGroupsClient(client_wrapper=self._client_wrapper)
         return self._groups
+
+    @property
+    def guest_badges(self):
+        if self._guest_badges is None:
+            from .guest_badges.client import AsyncGuestBadgesClient  # noqa: E402
+
+            self._guest_badges = AsyncGuestBadgesClient(client_wrapper=self._client_wrapper)
+        return self._guest_badges
 
     @property
     def token(self):

@@ -16,7 +16,7 @@ class Address(UniversalBaseModel):
     A resolved address. Which fields are populated depends on `type`: `user`
     addresses include `email`/`isGuest`; `bot` addresses include
     `botCode`/`integrationId` when available; group addresses include only the
-    common fields. Classic bots, agents, assistants, and coworkers all project
+    common fields. Classic bots, agents, and assistants all project
     as `type: bot`.
     """
 
