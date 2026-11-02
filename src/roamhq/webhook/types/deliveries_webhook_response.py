@@ -14,7 +14,7 @@ from .deliveries_webhook_response_deliveries_item import DeliveriesWebhookRespon
 class DeliveriesWebhookResponse(UniversalBaseModel):
     deliveries: typing.List[DeliveriesWebhookResponseDeliveriesItem] = pydantic.Field()
     """
-    Failed delivery attempts, newest first. Empty array if none.
+    Failed delivery attempts, in the order set by `ascending` and `after`. Empty array if none.
     """
 
     next_cursor: typing_extensions.Annotated[

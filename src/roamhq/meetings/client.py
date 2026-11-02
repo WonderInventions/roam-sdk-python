@@ -30,6 +30,7 @@ class MeetingsClient:
         *,
         after: typing.Optional[str] = None,
         before: typing.Optional[str] = None,
+        ascending: typing.Optional[bool] = None,
         limit: typing.Optional[int] = None,
         cursor: typing.Optional[str] = None,
         request_options: typing.Optional[RequestOptions] = None,
@@ -48,13 +49,21 @@ class MeetingsClient:
         The plural alias `/recordings.list` is also registered for existing callers;
         use this singular form in new documentation and tooling.
 
-        The ordering of results depends on the filter specified:
+        The ordering of results depends on `ascending` and `after`:
 
-        - When no parameters are provided, the most recent recordings are returned,
-          sorted in reverse chronological order. This is equivalent to specifying `before`
-          as NOW and leaving `after` unspecified.
+        - `ascending=true` sorts in forward chronological order (oldest first).
+          `ascending=false` sorts in reverse chronological order (newest first),
+          even when `after` is specified.
 
-        - If `after` is specified, the results are sorted in forward chronological order.
+        - When `ascending` is omitted and `after` is not specified, the most recent
+          recordings are returned in reverse chronological order. This is equivalent
+          to specifying `before` as NOW and leaving `after` unspecified.
+
+        - When `ascending` is omitted and `after` is specified, the results are
+          sorted in forward chronological order.
+
+        Send the same `ascending` value on every page. The cursor marks where to
+        resume, not which direction to sort.
 
         Either dates or datetimes may be specified. Dates are interpreted in UTC.
 
@@ -71,6 +80,13 @@ class MeetingsClient:
         before : typing.Optional[str]
             The datetime until which to list recordings (YYYY-MM-DD or RFC-3339).
             Defaults to "now".
+
+        ascending : typing.Optional[bool]
+            `true` sorts oldest-first. `false` sorts newest-first, even when
+            `after` is set. When omitted, results are oldest-first if `after` is
+            set and newest-first otherwise. Send the same value on every page;
+            the cursor does not carry the direction. Accepts `true`/`false` or
+            `1`/`0`.
 
         limit : typing.Optional[int]
             The number of recordings to return per response. Default is 10.
@@ -97,7 +113,7 @@ class MeetingsClient:
         client.meetings.recording_list()
         """
         _response = self._raw_client.recording_list(
-            after=after, before=before, limit=limit, cursor=cursor, request_options=request_options
+            after=after, before=before, ascending=ascending, limit=limit, cursor=cursor, request_options=request_options
         )
         return _response.data
 
@@ -122,6 +138,7 @@ class AsyncMeetingsClient:
         *,
         after: typing.Optional[str] = None,
         before: typing.Optional[str] = None,
+        ascending: typing.Optional[bool] = None,
         limit: typing.Optional[int] = None,
         cursor: typing.Optional[str] = None,
         request_options: typing.Optional[RequestOptions] = None,
@@ -140,13 +157,21 @@ class AsyncMeetingsClient:
         The plural alias `/recordings.list` is also registered for existing callers;
         use this singular form in new documentation and tooling.
 
-        The ordering of results depends on the filter specified:
+        The ordering of results depends on `ascending` and `after`:
 
-        - When no parameters are provided, the most recent recordings are returned,
-          sorted in reverse chronological order. This is equivalent to specifying `before`
-          as NOW and leaving `after` unspecified.
+        - `ascending=true` sorts in forward chronological order (oldest first).
+          `ascending=false` sorts in reverse chronological order (newest first),
+          even when `after` is specified.
 
-        - If `after` is specified, the results are sorted in forward chronological order.
+        - When `ascending` is omitted and `after` is not specified, the most recent
+          recordings are returned in reverse chronological order. This is equivalent
+          to specifying `before` as NOW and leaving `after` unspecified.
+
+        - When `ascending` is omitted and `after` is specified, the results are
+          sorted in forward chronological order.
+
+        Send the same `ascending` value on every page. The cursor marks where to
+        resume, not which direction to sort.
 
         Either dates or datetimes may be specified. Dates are interpreted in UTC.
 
@@ -163,6 +188,13 @@ class AsyncMeetingsClient:
         before : typing.Optional[str]
             The datetime until which to list recordings (YYYY-MM-DD or RFC-3339).
             Defaults to "now".
+
+        ascending : typing.Optional[bool]
+            `true` sorts oldest-first. `false` sorts newest-first, even when
+            `after` is set. When omitted, results are oldest-first if `after` is
+            set and newest-first otherwise. Send the same value on every page;
+            the cursor does not carry the direction. Accepts `true`/`false` or
+            `1`/`0`.
 
         limit : typing.Optional[int]
             The number of recordings to return per response. Default is 10.
@@ -197,6 +229,6 @@ class AsyncMeetingsClient:
         asyncio.run(main())
         """
         _response = await self._raw_client.recording_list(
-            after=after, before=before, limit=limit, cursor=cursor, request_options=request_options
+            after=after, before=before, ascending=ascending, limit=limit, cursor=cursor, request_options=request_options
         )
         return _response.data

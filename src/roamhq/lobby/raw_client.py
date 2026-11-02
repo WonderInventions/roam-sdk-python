@@ -164,6 +164,7 @@ class RawLobbyClient:
         lobby_id: str,
         after: typing.Optional[dt.datetime] = None,
         before: typing.Optional[dt.datetime] = None,
+        ascending: typing.Optional[bool] = None,
         limit: typing.Optional[int] = None,
         cursor: typing.Optional[str] = None,
         request_options: typing.Optional[RequestOptions] = None,
@@ -171,13 +172,21 @@ class RawLobbyClient:
         """
         Lists bookings for a specific lobby configuration, filtered by date range (after/before).
 
-        The ordering of results depends on the filter specified:
+        The ordering of results depends on `ascending` and `after`:
 
-        - When no parameters are provided, the most recent bookings are returned,
-          sorted in reverse chronological order. This is equivalent to specifying `before`
-          as NOW and leaving `after` unspecified.
+        - `ascending=true` sorts in forward chronological order (oldest first).
+          `ascending=false` sorts in reverse chronological order (newest first),
+          even when `after` is specified.
 
-        - If `after` is specified, the results are sorted in forward chronological order.
+        - When `ascending` is omitted and `after` is not specified, the most recent
+          bookings are returned in reverse chronological order. This is equivalent
+          to specifying `before` as NOW and leaving `after` unspecified.
+
+        - When `ascending` is omitted and `after` is specified, the results are
+          sorted in forward chronological order.
+
+        Send the same `ascending` value on every page. The cursor marks where to
+        resume, not which direction to sort.
 
         Either dates or datetimes may be specified. Dates are interpreted in UTC.
 
@@ -197,6 +206,13 @@ class RawLobbyClient:
         before : typing.Optional[dt.datetime]
             The datetime until which to list bookings (YYYY-MM-DD or RFC-3339).
             Defaults to "now".
+
+        ascending : typing.Optional[bool]
+            `true` sorts oldest-first. `false` sorts newest-first, even when
+            `after` is set. When omitted, results are oldest-first if `after` is
+            set and newest-first otherwise. Send the same value on every page;
+            the cursor does not carry the direction. Accepts `true`/`false` or
+            `1`/`0`.
 
         limit : typing.Optional[int]
             The number of bookings to return per response. Default is 10.
@@ -219,6 +235,7 @@ class RawLobbyClient:
                 "lobbyId": lobby_id,
                 "after": serialize_datetime(after) if after is not None else None,
                 "before": serialize_datetime(before) if before is not None else None,
+                "ascending": ascending,
                 "limit": limit,
                 "cursor": cursor,
             },
@@ -449,6 +466,7 @@ class AsyncRawLobbyClient:
         lobby_id: str,
         after: typing.Optional[dt.datetime] = None,
         before: typing.Optional[dt.datetime] = None,
+        ascending: typing.Optional[bool] = None,
         limit: typing.Optional[int] = None,
         cursor: typing.Optional[str] = None,
         request_options: typing.Optional[RequestOptions] = None,
@@ -456,13 +474,21 @@ class AsyncRawLobbyClient:
         """
         Lists bookings for a specific lobby configuration, filtered by date range (after/before).
 
-        The ordering of results depends on the filter specified:
+        The ordering of results depends on `ascending` and `after`:
 
-        - When no parameters are provided, the most recent bookings are returned,
-          sorted in reverse chronological order. This is equivalent to specifying `before`
-          as NOW and leaving `after` unspecified.
+        - `ascending=true` sorts in forward chronological order (oldest first).
+          `ascending=false` sorts in reverse chronological order (newest first),
+          even when `after` is specified.
 
-        - If `after` is specified, the results are sorted in forward chronological order.
+        - When `ascending` is omitted and `after` is not specified, the most recent
+          bookings are returned in reverse chronological order. This is equivalent
+          to specifying `before` as NOW and leaving `after` unspecified.
+
+        - When `ascending` is omitted and `after` is specified, the results are
+          sorted in forward chronological order.
+
+        Send the same `ascending` value on every page. The cursor marks where to
+        resume, not which direction to sort.
 
         Either dates or datetimes may be specified. Dates are interpreted in UTC.
 
@@ -482,6 +508,13 @@ class AsyncRawLobbyClient:
         before : typing.Optional[dt.datetime]
             The datetime until which to list bookings (YYYY-MM-DD or RFC-3339).
             Defaults to "now".
+
+        ascending : typing.Optional[bool]
+            `true` sorts oldest-first. `false` sorts newest-first, even when
+            `after` is set. When omitted, results are oldest-first if `after` is
+            set and newest-first otherwise. Send the same value on every page;
+            the cursor does not carry the direction. Accepts `true`/`false` or
+            `1`/`0`.
 
         limit : typing.Optional[int]
             The number of bookings to return per response. Default is 10.
@@ -504,6 +537,7 @@ class AsyncRawLobbyClient:
                 "lobbyId": lobby_id,
                 "after": serialize_datetime(after) if after is not None else None,
                 "before": serialize_datetime(before) if before is not None else None,
+                "ascending": ascending,
                 "limit": limit,
                 "cursor": cursor,
             },

@@ -30,6 +30,8 @@ class RawUserAuditLogClient:
         """
         Get a list of user audit log entries for the account.
 
+        **Access:** Organization only.
+
         **Required scope:** `userauditlog:read`
 
         Parameters
@@ -126,6 +128,8 @@ class AsyncRawUserAuditLogClient:
     ) -> AsyncHttpResponse[ListUserAuditLogResponse]:
         """
         Get a list of user audit log entries for the account.
+
+        **Access:** Organization only.
 
         **Required scope:** `userauditlog:read`
 

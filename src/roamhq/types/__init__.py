@@ -22,12 +22,21 @@ if typing.TYPE_CHECKING:
     from .chat_message_user_type import ChatMessageUserType
     from .chat_message_voice import ChatMessageVoice
     from .error import Error
+    from .folder import Folder
+    from .folder_content import FolderContent
+    from .folder_content_type import FolderContentType
+    from .folder_meeting import FolderMeeting
+    from .folder_meeting_video_status import FolderMeetingVideoStatus
+    from .folder_member import FolderMember
+    from .folder_member_role import FolderMemberRole
+    from .folder_role import FolderRole
     from .group import Group
     from .group_access_mode import GroupAccessMode
     from .group_group_management import GroupGroupManagement
     from .group_member import GroupMember
     from .group_member_role import GroupMemberRole
     from .group_type import GroupType
+    from .guest_badge import GuestBadge
     from .lobby_booking import LobbyBooking
     from .lobby_booking_host import LobbyBookingHost
     from .lobby_booking_invitee import LobbyBookingInvitee
@@ -43,6 +52,7 @@ if typing.TYPE_CHECKING:
     from .meeting_participant_type import MeetingParticipantType
     from .reaction import Reaction
     from .sender import Sender
+    from .ticker_message import TickerMessage
     from .unfurl_content import UnfurlContent
     from .unfurl_content_image import UnfurlContentImage
     from .user import User
@@ -52,13 +62,17 @@ if typing.TYPE_CHECKING:
     from .user_audit_log import UserAuditLog
     from .user_audit_log_platform import UserAuditLogPlatform
     from .user_status import UserStatus
+    from .user_status_bubble_response import UserStatusBubbleResponse
+    from .user_status_bubble_response_status_bubble import UserStatusBubbleResponseStatusBubble
     from .user_type import UserType
-    from .user_will_return import UserWillReturn
     from .webhook import Webhook
+    from .webhook_destination import WebhookDestination
+    from .webhook_destination_type import WebhookDestinationType
     from .webhook_event import WebhookEvent
     from .webhook_subscription_filter import WebhookSubscriptionFilter
     from .webhook_subscription_filter_chat_type import WebhookSubscriptionFilterChatType
     from .webhook_subscription_filter_status import WebhookSubscriptionFilterStatus
+    from .will_return import WillReturn
 _dynamic_imports: typing.Dict[str, str] = {
     "ActionItem": ".action_item",
     "Address": ".address",
@@ -74,12 +88,21 @@ _dynamic_imports: typing.Dict[str, str] = {
     "ChatMessageUserType": ".chat_message_user_type",
     "ChatMessageVoice": ".chat_message_voice",
     "Error": ".error",
+    "Folder": ".folder",
+    "FolderContent": ".folder_content",
+    "FolderContentType": ".folder_content_type",
+    "FolderMeeting": ".folder_meeting",
+    "FolderMeetingVideoStatus": ".folder_meeting_video_status",
+    "FolderMember": ".folder_member",
+    "FolderMemberRole": ".folder_member_role",
+    "FolderRole": ".folder_role",
     "Group": ".group",
     "GroupAccessMode": ".group_access_mode",
     "GroupGroupManagement": ".group_group_management",
     "GroupMember": ".group_member",
     "GroupMemberRole": ".group_member_role",
     "GroupType": ".group_type",
+    "GuestBadge": ".guest_badge",
     "LobbyBooking": ".lobby_booking",
     "LobbyBookingHost": ".lobby_booking_host",
     "LobbyBookingInvitee": ".lobby_booking_invitee",
@@ -95,6 +118,7 @@ _dynamic_imports: typing.Dict[str, str] = {
     "MeetingParticipantType": ".meeting_participant_type",
     "Reaction": ".reaction",
     "Sender": ".sender",
+    "TickerMessage": ".ticker_message",
     "UnfurlContent": ".unfurl_content",
     "UnfurlContentImage": ".unfurl_content_image",
     "User": ".user",
@@ -104,13 +128,17 @@ _dynamic_imports: typing.Dict[str, str] = {
     "UserAuditLog": ".user_audit_log",
     "UserAuditLogPlatform": ".user_audit_log_platform",
     "UserStatus": ".user_status",
+    "UserStatusBubbleResponse": ".user_status_bubble_response",
+    "UserStatusBubbleResponseStatusBubble": ".user_status_bubble_response_status_bubble",
     "UserType": ".user_type",
-    "UserWillReturn": ".user_will_return",
     "Webhook": ".webhook",
+    "WebhookDestination": ".webhook_destination",
+    "WebhookDestinationType": ".webhook_destination_type",
     "WebhookEvent": ".webhook_event",
     "WebhookSubscriptionFilter": ".webhook_subscription_filter",
     "WebhookSubscriptionFilterChatType": ".webhook_subscription_filter_chat_type",
     "WebhookSubscriptionFilterStatus": ".webhook_subscription_filter_status",
+    "WillReturn": ".will_return",
 }
 
 
@@ -150,12 +178,21 @@ __all__ = [
     "ChatMessageUserType",
     "ChatMessageVoice",
     "Error",
+    "Folder",
+    "FolderContent",
+    "FolderContentType",
+    "FolderMeeting",
+    "FolderMeetingVideoStatus",
+    "FolderMember",
+    "FolderMemberRole",
+    "FolderRole",
     "Group",
     "GroupAccessMode",
     "GroupGroupManagement",
     "GroupMember",
     "GroupMemberRole",
     "GroupType",
+    "GuestBadge",
     "LobbyBooking",
     "LobbyBookingHost",
     "LobbyBookingInvitee",
@@ -171,6 +208,7 @@ __all__ = [
     "MeetingParticipantType",
     "Reaction",
     "Sender",
+    "TickerMessage",
     "UnfurlContent",
     "UnfurlContentImage",
     "User",
@@ -180,11 +218,15 @@ __all__ = [
     "UserAuditLog",
     "UserAuditLogPlatform",
     "UserStatus",
+    "UserStatusBubbleResponse",
+    "UserStatusBubbleResponseStatusBubble",
     "UserType",
-    "UserWillReturn",
     "Webhook",
+    "WebhookDestination",
+    "WebhookDestinationType",
     "WebhookEvent",
     "WebhookSubscriptionFilter",
     "WebhookSubscriptionFilterChatType",
     "WebhookSubscriptionFilterStatus",
+    "WillReturn",
 ]
